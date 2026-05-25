@@ -2,7 +2,7 @@
 
 ## Purpose
 
-Collects a student's holistic academic and extracurricular profile through an interactive wizard and stores it as a structured markdown file. Also provides display of the stored profile. Fully offline — no AI or external service calls.
+Collects a student's holistic academic and extracurricular profile through a nested, menu-driven interface and stores it as a structured JSON and markdown file. On finalization, uses Gemini to enhance text fields — correcting spelling/grammar, ensuring consistency, and framing inputs as student strengths in an honest voice — before generating `profile.md`. Raw user input is always preserved in `profile.json`; the LLM enhancement is a rendering step only.
 
 ---
 
@@ -10,111 +10,172 @@ Collects a student's holistic academic and extracurricular profile through an in
 
 | Status | ID | Description | Priority | Req Ref | Doc Level |
 | :----- | :- | :---------- | :------- | :------ | :-------- |
-| `Complete` | C02-F01 | Run the student profile wizard to collect all profile fields interactively and save to markdown | P1 | REQ-0001, REQ-0002 | - |
-| `Complete` | C02-F02 | Detect an existing profile and prompt to update (section by section) rather than overwriting silently | P1 | REQ-0001 | - |
+| `Ready` | C02-F01 | Navigate and edit the student profile via a nested menu; track completion status per field/section; gate finalization until all fields are `set` or `skipped` | P1 | REQ-0001, REQ-0002 | - |
+| `Ready` | C02-F02 | Load existing `profile.json` on re-entry; resume the same menu with current values pre-filled and completion indicators intact | P1 | REQ-0001 | - |
 | `Complete` | C02-F03 | Display the stored student profile markdown to stdout | P1 | REQ-0003 | - |
-| `Complete` | C02-F04 | Store the profile as a structured markdown file at the canonical path | P1 | REQ-0013 | - |
+| `Ready` | C02-F04 | On Finalize: enhance all text fields via Gemini (honest student voice, no marketing tone), then generate `profile.md` from enhanced data — raw `profile.json` is never modified | P1 | REQ-0013 | - |
+| `Ready` | C02-F05 | Write `profile.json` after every individual field input — never lose data mid-session | P1 | REQ-0001 | - |
 
 ---
 
-## Wizard Question Sequence
+## Menu Structure
 
-The wizard collects data in sections. Each section is independently re-runnable (for updates). Enquirer prompt types are specified per field.
+The interface is fully menu-driven and nested. There is no linear wizard. The same menu is used for both new profiles and edits.
+
+### Level 1 — Main Menu
+
+```
+Student Profile: <name>                    ● 3 sections pending
+
+  Personal                                 ✓ complete
+  Academics                                ● 2 fields pending
+  Standardized Tests                       ○ not started
+  Extracurriculars                         ✓ complete
+  Awards & Recognitions                    ○ not started
+  Personal Statement                       ○ not started
+  ─────────────────────────────────────
+  Finalize & Save                          (disabled until all ✓ or –)
+  Quit without saving
+```
+
+Completion indicators per section:
+- `✓ complete` — all fields in section are `set` or `skipped`
+- `● N fields pending` — section has been partially entered
+- `○ not started` — no fields in section have been touched
+- `– skipped` — user explicitly skipped the entire section
+
+### Level 2 — Section Menu
+
+Selecting a section opens its field list:
+
+```
+Academics
+
+  GPA (Weighted)          ✓  4.3
+  GPA (Unweighted)        ✓  3.9
+  Class Rank              –  skipped
+  Transcript              ●  2 years added
+  ─────────────────────────────────────
+  Skip entire section
+  Back
+```
+
+Field indicators:
+- `✓  <value>` — field is set; current value shown inline
+- `–  skipped` — field was explicitly skipped by user
+- `●  <summary>` — list field with N entries
+- `○` — not yet answered
+
+### Level 3 — Field Edit / List Management
+
+**Scalar field:** Opens an `input` or `select` prompt pre-filled with current value. User edits and confirms → value saved → back to Section Menu.
+
+**Skippable field:** After any scalar prompt, offer `[Enter value / Skip]` — selecting Skip marks the field `skipped`.
+
+**List field (transcript, ECs, awards, AP/IB scores):** Opens a list management sub-menu:
+
+```
+Transcript  (2 entries)
+
+  9th Grade   →  4 courses
+  10th Grade  →  3 courses
+  ─────────────────────────
+  Add entry
+  Back
+```
+
+Selecting an existing entry opens an edit sub-menu:
+```
+  Edit entry
+  Remove entry
+  Back
+```
+
+---
+
+## Field Catalogue
 
 ### Section 1 — Personal
 
-| Field | Prompt type | Required? | Notes |
-| :---- | :---------- | :-------- | :---- |
-| `name` | `input` | Yes | Full legal name; used as display only — directory slug comes from C01 |
-| `gradYear` | `input` | Yes | Expected graduation year (4-digit) |
-| `highSchool` | `input` | Yes | High school name |
-| `intendedMajor` | `input` | Yes | Major or academic track (e.g., Computer Science, Pre-Med, BS/MD) |
+| Field | Prompt type | Skippable? | Notes |
+| :---- | :---------- | :--------- | :---- |
+| `name` | `input` | No | Full legal name |
+| `gradYear` | `input` | No | Expected graduation year (4-digit) |
+| `highSchool` | `input` | No | High school name |
+| `intendedMajors` | list | No | One entry per major/track; minimum 1 required |
 
 ### Section 2 — Academics
 
-| Field | Prompt type | Required? | Notes |
-| :---- | :---------- | :-------- | :---- |
-| `gpaWeighted` | `input` | Yes | Weighted GPA (numeric, e.g., 4.3) |
-| `gpaUnweighted` | `input` | Yes | Unweighted GPA (numeric, e.g., 3.9) |
-| `classRank` | `input` | No | e.g., "12 of 450" — free text |
-| `transcript` | multi-step loop | Yes | One entry per year: year label + list of courses with letter grades (see Transcript Entry below) |
-
-#### Transcript Entry (per academic year)
-
-Repeated for each year the student has completed:
-
-| Field | Prompt type | Notes |
-| :---- | :---------- | :---- |
-| `yearLabel` | `input` | e.g., "9th Grade", "10th Grade" |
-| `courses` | repeating `input` pairs | Course name + letter grade; loop until student confirms done |
+| Field | Prompt type | Skippable? | Notes |
+| :---- | :---------- | :--------- | :---- |
+| `gpaWeighted` | `input` | No | Numeric, e.g. 4.3 |
+| `gpaUnweighted` | `input` | No | Numeric, e.g. 3.9 |
+| `classRank` | `input` | Yes | e.g. "12 of 450" |
+| `transcript` | list | Yes | One entry per year; each entry has yearLabel + courses |
 
 ### Section 3 — Standardized Tests
 
-| Field | Prompt type | Required? | Notes |
-| :---- | :---------- | :-------- | :---- |
-| `sat.total` | `input` | No | Total SAT score (e.g., 1520) |
-| `sat.math` | `input` | No | SAT Math subscore |
-| `sat.reading` | `input` | No | SAT Evidence-Based Reading & Writing subscore |
-| `act.composite` | `input` | No | ACT composite score (e.g., 34) |
-| `apScores` | repeating `input` pairs | No | Subject name + score (1–5); loop until done |
-| `ibScores` | repeating `input` pairs | No | Subject name + predicted/final score; loop until done |
+| Field | Prompt type | Skippable? | Notes |
+| :---- | :---------- | :--------- | :---- |
+| `sat.total` | `input` | Yes | 400–1600 |
+| `sat.math` | `input` | Yes | 200–800 |
+| `sat.reading` | `input` | Yes | 200–800 |
+| `act.composite` | `input` | Yes | 1–36 |
+| `apScores` | list | Yes | Subject + score (1–5) per entry |
+| `ibScores` | list | Yes | Subject + predicted/final score per entry |
 
 ### Section 4 — Extracurriculars
 
-| Field | Prompt type | Required? | Notes |
-| :---- | :---------- | :-------- | :---- |
-| `extracurriculars` | repeating structured entry | No | One entry per activity (see below); loop until done |
-
-#### Extracurricular Entry
-
-| Field | Prompt type | Notes |
-| :---- | :---------- | :---- |
-| `activityName` | `input` | e.g., "Varsity Soccer", "Robotics Club" |
-| `role` | `input` | e.g., "Captain", "Member", "President" |
-| `yearsInvolved` | `input` | e.g., "2021–2024" |
-| `hoursPerWeek` | `input` | Approximate hours per week |
-| `description` | `input` | One-sentence description of impact/involvement |
+| Field | Prompt type | Skippable? | Notes |
+| :---- | :---------- | :--------- | :---- |
+| `extracurriculars` | list | Yes | activityName, role, yearsInvolved, hoursPerWeek, description per entry |
 
 ### Section 5 — Awards & Recognitions
 
-| Field | Prompt type | Required? | Notes |
-| :---- | :---------- | :-------- | :---- |
-| `awards` | repeating structured entry | No | One entry per award; loop until done |
+| Field | Prompt type | Skippable? | Notes |
+| :---- | :---------- | :--------- | :---- |
+| `awards` | list | Yes | awardName, level (select), year, description per entry |
 
-#### Award Entry
+---
 
-| Field | Prompt type | Notes |
-| :---- | :---------- | :---- |
-| `awardName` | `input` | e.g., "National Merit Scholar Finalist" |
-| `level` | `select` | Local / Regional / State / National / International |
-| `year` | `input` | Year received |
-| `description` | `input` | One-sentence description |
+## Completion Model
 
-### Section 6 — Personal Statement Drafts (Optional)
+Each field carries one of three statuses stored in `profile.json`:
 
-| Field | Prompt type | Required? | Notes |
-| :---- | :---------- | :-------- | :---- |
-| `hasPersonalStatement` | `confirm` | No | Yes/No — if No, section skipped |
-| `personalStatementSummary` | `input` | Conditional | Brief summary or key themes (not the full essay) |
+| Status | Meaning |
+| :----- | :------ |
+| `pending` | Never answered in this session or any prior session |
+| `set` | Has a value (including empty list explicitly confirmed as done) |
+| `skipped` | User explicitly chose to skip |
+
+**Finalization gate:** `Finalize & Save` is enabled only when every field in every section is `set` or `skipped`. The menu shows it as disabled (greyed label) otherwise.
+
+**Section completion:** A section is `✓ complete` when all its fields are `set` or `skipped`.
 
 ---
 
 ## Data Flows
 
-**F01 — Build (new profile):**
-`C01 dispatches buildStudentProfile(name?) → prompt for name if not provided → run wizard section by section → assemble ProfileData object → serialize to markdown → write to data/students/<slug>/profile.md → return { profilePath }`
+**F01 — New profile:**
+`C01 dispatches buildStudentProfile(name?) → prompt for name if not provided → initialize ProfileData with all fields pending → open Main Menu → user navigates and edits fields → profile.json written after every field input (F05-JSON) → user selects Finalize & Save → write profile.md once (F05-MD) → return { profilePath }`
 
-**F02 — Build (update existing):**
-`C01 dispatches buildStudentProfile(name) → detect existing profile.md → prompt: "Profile exists. Update a section?" → select section → run wizard for that section only → merge with existing data → rewrite profile.md → return { profilePath }`
+**F02 — Resume/edit existing:**
+`C01 dispatches buildStudentProfile(name) → detect existing profile.json → load full ProfileData (values + field statuses) → open Main Menu with indicators reflecting loaded state → user navigates and edits → profile.json written after every field input (F05-JSON) → user selects Finalize & Save → write profile.md once (F05-MD) → return { profilePath }`
 
 **F03 — Show:**
 `C01 dispatches showStudentProfile(name) → resolve data/students/<slug>/profile.md → file exists? → read and print to stdout → return { markdownPath } → else: print "No profile found" + exit(1)`
 
-**F04 — Write:**
-`ProfileData object → renderProfileMarkdown(data) → fs.writeFile(path, markdown, 'utf8') → confirm write`
+**F04 — Enhance + generate markdown:**
+`On Finalize & Save → load ProfileData from profile.json (raw, unmodified) → call Gemini with full ProfileData → receive EnhancedProfileData (text fields polished, raw values for scalar fields) → renderProfileMarkdown(enhancedData) → write profile.md → profile.json is never written during this step`
+
+**F05-JSON — Incremental save:**
+`After every individual field input → JSON.stringify(ProfileData including field statuses) → write to data/students/<slug>/profile.json`
+
+**F05-MD — Final markdown generation:**
+`On Finalize & Save → renderProfileMarkdown(data) → write to data/students/<slug>/profile.md`
 
 ---
 
 ## Execution Mode
 
-Request-driven. Invoked by C01 per user command. Runs synchronously within the CLI process. Interactive wizard uses Enquirer prompts (async/await). No background processes.
+Request-driven. Invoked by C01 per user command. Runs within the CLI process. Menu navigation uses Enquirer prompts (async/await). No background processes.

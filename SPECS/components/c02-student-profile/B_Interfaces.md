@@ -5,9 +5,9 @@
 ```typescript
 buildStudentProfile(name?: string): Promise<{ profilePath: string }>
 ```
-- If `name` is undefined, wizard prompts for it as Section 1 first field.
-- If profile already exists at resolved path, triggers update flow (C02-F02).
-- Returns the absolute path to the saved `profile.md`.
+- If `name` is undefined, prompts for it as the first input before opening the menu.
+- If `profile.json` exists at the resolved path, loads it and resumes the menu with existing values and field statuses.
+- Returns the absolute path to the saved `profile.md` (written on Finalize & Save).
 
 ```typescript
 showStudentProfile(name: string): Promise<{ markdownPath: string }>
@@ -18,10 +18,70 @@ showStudentProfile(name: string): Promise<{ markdownPath: string }>
 
 ---
 
+## JSON Sidecar Schema
+
+**Path:** `data/students/<slug>/profile.json`
+**Encoding:** UTF-8
+**Role:** Canonical source of truth. Written after every individual field input. Read on every session start. Includes field-level completion statuses alongside values.
+
+```json
+{
+  "name": "string",
+  "gradYear": "string",
+  "highSchool": "string",
+  "intendedMajors": ["string"],
+  "gpaWeighted": "string",
+  "gpaUnweighted": "string",
+  "classRank": "string",
+  "transcript": [
+    { "yearLabel": "string", "courses": [{ "name": "string", "grade": "string" }] }
+  ],
+  "sat": { "total": "string", "math": "string", "reading": "string" },
+  "act": { "composite": "string" },
+  "apScores": [{ "subject": "string", "score": "string" }],
+  "ibScores": [{ "subject": "string", "score": "string" }],
+  "extracurriculars": [
+    {
+      "activityName": "string",
+      "role": "string",
+      "yearsInvolved": "string",
+      "hoursPerWeek": "string",
+      "description": "string"
+    }
+  ],
+  "awards": [
+    { "awardName": "string", "level": "string", "year": "string", "description": "string" }
+  ],
+  "generatedDate": "string",
+  "lastUpdated": "string",
+  "fieldStatus": {
+    "name": "pending | set | skipped",
+    "gradYear": "pending | set | skipped",
+    "highSchool": "pending | set | skipped",
+    "intendedMajors": "pending | set | skipped",
+    "gpaWeighted": "pending | set | skipped",
+    "gpaUnweighted": "pending | set | skipped",
+    "classRank": "pending | set | skipped",
+    "transcript": "pending | set | skipped",
+    "satTotal": "pending | set | skipped",
+    "satMath": "pending | set | skipped",
+    "satReading": "pending | set | skipped",
+    "actComposite": "pending | set | skipped",
+    "apScores": "pending | set | skipped",
+    "ibScores": "pending | set | skipped",
+    "extracurriculars": "pending | set | skipped",
+    "awards": "pending | set | skipped"
+  }
+}
+```
+
+---
+
 ## Markdown File Schema
 
 **Path:** `data/students/<slug>/profile.md`
 **Encoding:** UTF-8
+**Role:** Human-readable display and AI prompt input. Written exactly once per session on Finalize & Save. Never parsed back to structured data.
 
 ```markdown
 # Student Profile: <name>
@@ -38,7 +98,7 @@ showStudentProfile(name: string): Promise<{ markdownPath: string }>
 | Full Name | |
 | Graduation Year | |
 | High School | |
-| Intended Major / Track | |
+| Intended Majors / Tracks | |
 
 ---
 
@@ -52,7 +112,7 @@ showStudentProfile(name: string): Promise<{ markdownPath: string }>
 
 ### Transcript
 
-#### <Year Label> (e.g., 9th Grade)
+#### <Year Label>
 
 | Course | Grade |
 | :----- | :---- |
@@ -112,10 +172,49 @@ showStudentProfile(name: string): Promise<{ markdownPath: string }>
 
 | Component | What it reads | Field(s) |
 | :-------- | :------------ | :------- |
-| C01 CLI Shell | Prerequisite check | `intendedMajor` (presence + non-empty) |
+| C01 CLI Shell | Prerequisite check | `intendedMajors` (presence + non-empty) |
 | C04 Guidance Engine | Full profile for Gemini prompt | Entire `profile.md` |
 | C05 Essay Advisor | Full profile for Gemini prompt | Entire `profile.md` |
 | C06 PDF Exporter | Markdown → PDF | `markdownPath` |
+
+Note: C04, C05, C06 consume `profile.md` only. `profile.json` is internal to C02.
+
+---
+
+## LLM Enhancement Contract
+
+**Service:** Gemini (same model as C03/C04/C05 — `GEMINI_MODEL` env var).
+
+**Trigger:** Called once at Finalize & Save, between loading `profile.json` and writing `profile.md`.
+
+**Input:** Full raw `ProfileData` from `profile.json`.
+
+**Output:** `EnhancedProfileData` — structurally identical to `ProfileData`; only text fields are modified.
+
+### Fields passed through unchanged (LLM must not alter)
+
+These are factual/numeric — any change would be a data integrity violation:
+
+`name`, `gradYear`, `highSchool`, `intendedMajors[]`, `gpaWeighted`, `gpaUnweighted`, `classRank`, `sat.*`, `act.*`, `apScores[].subject`, `apScores[].score`, `ibScores[].subject`, `ibScores[].score`, `awards[].level`, `awards[].year`, `extracurriculars[].yearsInvolved`, `extracurriculars[].hoursPerWeek`, `generatedDate`, `lastUpdated`
+
+### Fields enhanced by LLM
+
+| Field | Enhancement goal |
+| :---- | :--------------- |
+| `highSchool` | Fix spelling/capitalisation only |
+| `extracurriculars[].activityName` | Fix spelling/capitalisation only |
+| `extracurriculars[].role` | Fix spelling/capitalisation only |
+| `extracurriculars[].description` | Correct grammar/spelling; reframe as concrete student strength in honest first-person voice; no superlatives or marketing language |
+| `awards[].awardName` | Fix spelling/capitalisation only |
+| `awards[].description` | Correct grammar/spelling; highlight significance from student's perspective; honest voice |
+
+### Prompt contract
+
+- Persona: senior college counsellor reviewing a student's self-reported profile
+- Tone: honest, specific, grounded — never boastful or generic
+- Must not: invent facts, add claims not in the original, use phrases like "passionate about", "dedicated to", "driven by"
+- Must: preserve the student's intended meaning; fix errors silently; keep descriptions concise
+- Output: JSON object with the same structure as `ProfileData` — only the fields listed above may differ from input
 
 ---
 

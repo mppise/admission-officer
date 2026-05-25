@@ -1,8 +1,13 @@
 import Enquirer from 'enquirer';
+import { GoogleGenerativeAI } from '@google/generative-ai';
 import { dataPath, writeFile, readFile, fileExists } from '../../utils/fileUtils.js';
 import { toSlug } from '../../utils/slugUtils.js';
+import { loadPrompt } from '../../ai/promptLoader.js';
+import { getGeminiApiKey, getGeminiModel } from '../../config/env.js';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
+
+type FieldStatus = 'pending' | 'set' | 'skipped';
 
 interface TranscriptYear {
   yearLabel: string;
@@ -39,186 +44,637 @@ interface ProfileData {
   ibScores: Array<{ subject: string; score: string }>;
   extracurriculars: Extracurricular[];
   awards: Award[];
-  personalStatementSummary: string;
   generatedDate: string;
   lastUpdated: string;
+  fieldStatus: Record<string, FieldStatus>;
 }
 
-// ─── Prompts ──────────────────────────────────────────────────────────────────
+// ─── Prompt helpers ───────────────────────────────────────────────────────────
 
-const enq = new Enquirer();
+// Enquirer separator choice — rendered as a non-selectable divider line
+const SEP = { role: 'separator', value: '─────────────' };
+type Choice = string | typeof SEP;
 
-async function ask(question: { type: string; name: string; message: string; choices?: string[]; required?: boolean; initial?: string }): Promise<string> {
-  const response = await enq.prompt(question) as Record<string, string>;
-  return response[question.name] ?? '';
+async function ask(question: {
+  type: string;
+  name: string;
+  message: string;
+  choices?: Choice[];
+  initial?: string;
+}): Promise<string> {
+  // Fresh instance per call — prevents Enquirer from caching choices across prompts
+  const instance = new Enquirer();
+  const response = await instance.prompt(question) as Record<string, unknown>;
+  const val = response[question.name];
+  // Enquirer select can return a choice object instead of the string value
+  if (val !== null && typeof val === 'object' && 'value' in (val as object)) {
+    return String((val as Record<string, unknown>)['value'] ?? '');
+  }
+  return String(val ?? '');
 }
 
 async function confirm(message: string): Promise<boolean> {
-  const response = await enq.prompt({ type: 'confirm', name: 'value', message }) as { value: boolean };
+  const instance = new Enquirer();
+  const response = await instance.prompt({ type: 'confirm', name: 'value', message }) as { value: boolean };
   return response.value;
 }
 
-// Asks for a value; returns the trimmed string, or null if the user pressed Enter with no input.
-// Used to drive "add another?" loops — blank = done.
-async function askOrSkip(question: { name: string; message: string; initial?: string }): Promise<string | null> {
-  const response = await enq.prompt({ type: 'input', required: false, ...question }) as Record<string, string>;
-  const val = (response[question.name] ?? '').trim();
-  return val.length > 0 ? val : null;
+// ─── Persistence ──────────────────────────────────────────────────────────────
+
+function jsonPath(slug: string): string {
+  return dataPath(slug, 'profile.json');
 }
 
-// ─── Section Wizards ──────────────────────────────────────────────────────────
-
-async function collectPersonal(existing?: Partial<ProfileData>): Promise<Pick<ProfileData, 'name' | 'gradYear' | 'highSchool' | 'intendedMajors'>> {
-  console.log('\n── Section 1: Personal ──────────────────────────────');
-  const name = await ask({ type: 'input', name: 'name', message: 'Full legal name:', initial: existing?.name ?? '' });
-  const gradYear = await ask({ type: 'input', name: 'gradYear', message: 'Expected graduation year (e.g., 2026):', initial: existing?.gradYear ?? '' });
-  const highSchool = await ask({ type: 'input', name: 'highSchool', message: 'High school name:', initial: existing?.highSchool ?? '' });
-
-  const intendedMajors: string[] = [];
-  if (existing?.intendedMajors?.length) {
-    console.log(`\nCurrent majors: ${existing.intendedMajors.join(', ')}`);
-    console.log('Enter your majors again to replace the list, or press Enter immediately to keep as-is.');
-  } else {
-    console.log('\nIntended majors or academic tracks (e.g., Pre-Med, Computer Science, BS/MD):');
-  }
-  console.log('(Press Enter on a blank line when done)');
-  // eslint-disable-next-line no-constant-condition
-  while (true) {
-    const major = await askOrSkip({ name: 'major', message: '  Major or track:' });
-    if (!major) break;
-    intendedMajors.push(major);
-  }
-  // If the user pressed Enter immediately without entering anything, keep the existing list
-  const finalMajors = intendedMajors.length > 0 ? intendedMajors : (existing?.intendedMajors ?? []);
-
-  return { name, gradYear, highSchool, intendedMajors: finalMajors };
+function mdPath(slug: string): string {
+  return dataPath(slug, 'profile.md');
 }
 
-async function collectAcademics(existing?: Partial<ProfileData>): Promise<Pick<ProfileData, 'gpaWeighted' | 'gpaUnweighted' | 'classRank' | 'transcript'>> {
-  console.log('\n── Section 2: Academics ─────────────────────────────');
-  const gpaWeighted = await ask({ type: 'input', name: 'gpaWeighted', message: 'Weighted GPA (e.g., 4.3):', initial: existing?.gpaWeighted ?? '' });
-  const gpaUnweighted = await ask({ type: 'input', name: 'gpaUnweighted', message: 'Unweighted GPA (e.g., 3.9):', initial: existing?.gpaUnweighted ?? '' });
-  const classRank = await ask({ type: 'input', name: 'classRank', message: 'Class rank (e.g., "12 of 450") — press Enter to skip:', initial: existing?.classRank ?? '' });
-
-  const transcript: TranscriptYear[] = existing?.transcript ? [...existing.transcript] : [];
-  console.log('\nTranscript — add one row per school year (e.g. 9th Grade, 10th Grade).');
-  console.log('(Press Enter on a blank year label when done)');
-  // eslint-disable-next-line no-constant-condition
-  while (true) {
-    const yearLabel = await askOrSkip({ name: 'yearLabel', message: 'Year label (e.g., "9th Grade", "10th Grade"):' });
-    if (!yearLabel) break;
-    const courses: Array<{ name: string; grade: string }> = [];
-    console.log('  Add courses for this year. Press Enter on a blank course name when done.');
-    // eslint-disable-next-line no-constant-condition
-    while (true) {
-      const courseName = await askOrSkip({ name: 'courseName', message: '  Course name:' });
-      if (!courseName) break;
-      const grade = await ask({ type: 'input', name: 'grade', message: '  Letter grade:' });
-      courses.push({ name: courseName, grade });
-    }
-    transcript.push({ yearLabel, courses });
-  }
-  return { gpaWeighted, gpaUnweighted, classRank, transcript };
+// [C02-F05-JSON] Write profile.json after every field input — called after every mutation
+async function saveJson(slug: string, data: ProfileData): Promise<void> {
+  await writeFile(jsonPath(slug), JSON.stringify(data, null, 2));
 }
 
-async function collectTests(existing?: Partial<ProfileData>): Promise<Pick<ProfileData, 'sat' | 'act' | 'apScores' | 'ibScores'>> {
-  console.log('\n── Section 3: Standardized Tests ────────────────────');
-  console.log('(Press Enter to skip any test you have not taken)');
-
-  const satTotal = await ask({ type: 'input', name: 'satTotal', message: 'SAT Total score (e.g., 1520):', initial: existing?.sat?.total ?? '' });
-  const satMath = await ask({ type: 'input', name: 'satMath', message: 'SAT Math score:', initial: existing?.sat?.math ?? '' });
-  const satReading = await ask({ type: 'input', name: 'satReading', message: 'SAT Evidence-Based Reading & Writing score:', initial: existing?.sat?.reading ?? '' });
-  const actComposite = await ask({ type: 'input', name: 'actComposite', message: 'ACT Composite score (e.g., 34):', initial: existing?.act?.composite ?? '' });
-
-  const apScores: Array<{ subject: string; score: string }> = existing?.apScores ? [...existing.apScores] : [];
-  console.log('\nAP scores — press Enter on a blank subject when done.');
-  // eslint-disable-next-line no-constant-condition
-  while (true) {
-    const subject = await askOrSkip({ name: 'subject', message: '  AP Subject:' });
-    if (!subject) break;
-    const score = await ask({ type: 'input', name: 'score', message: '  Score (1-5):' });
-    apScores.push({ subject, score });
-  }
-
-  const ibScores: Array<{ subject: string; score: string }> = existing?.ibScores ? [...existing.ibScores] : [];
-  console.log('\nIB scores — press Enter on a blank subject when done.');
-  // eslint-disable-next-line no-constant-condition
-  while (true) {
-    const subject = await askOrSkip({ name: 'subject', message: '  IB Subject:' });
-    if (!subject) break;
-    const score = await ask({ type: 'input', name: 'score', message: '  Predicted/Final score:' });
-    ibScores.push({ subject, score });
-  }
-
+function emptyProfile(name: string, slug: string): ProfileData {
+  const now = new Date().toISOString().split('T')[0];
   return {
-    sat: { total: satTotal, math: satMath, reading: satReading },
-    act: { composite: actComposite },
-    apScores,
-    ibScores,
+    name,
+    gradYear: '',
+    highSchool: '',
+    intendedMajors: [],
+    gpaWeighted: '',
+    gpaUnweighted: '',
+    classRank: '',
+    transcript: [],
+    sat: { total: '', math: '', reading: '' },
+    act: { composite: '' },
+    apScores: [],
+    ibScores: [],
+    extracurriculars: [],
+    awards: [],
+    generatedDate: now,
+    lastUpdated: now,
+    fieldStatus: {
+      name: 'set', // already collected before menu opens
+      gradYear: 'pending',
+      highSchool: 'pending',
+      intendedMajors: 'pending',
+      gpaWeighted: 'pending',
+      gpaUnweighted: 'pending',
+      classRank: 'pending',
+      transcript: 'pending',
+      satTotal: 'pending',
+      satMath: 'pending',
+      satReading: 'pending',
+      actComposite: 'pending',
+      apScores: 'pending',
+      ibScores: 'pending',
+      extracurriculars: 'pending',
+      awards: 'pending',
+    },
   };
 }
 
-async function collectExtracurriculars(existing?: Partial<ProfileData>): Promise<Pick<ProfileData, 'extracurriculars'>> {
-  console.log('\n── Section 4: Extracurricular Activities ────────────');
-  console.log('Press Enter on a blank activity name when done.');
-  const extracurriculars: Extracurricular[] = existing?.extracurriculars ? [...existing.extracurriculars] : [];
-  // eslint-disable-next-line no-constant-condition
-  while (true) {
-    const activityName = await askOrSkip({ name: 'activityName', message: '  Activity name (e.g., Robotics Club):' });
-    if (!activityName) break;
-    const role = await ask({ type: 'input', name: 'role', message: '  Your role (e.g., President, Member):' });
-    const yearsInvolved = await ask({ type: 'input', name: 'yearsInvolved', message: '  Years involved (e.g., 2021–2024):' });
-    const hoursPerWeek = await ask({ type: 'input', name: 'hoursPerWeek', message: '  Hours per week (approximate):' });
-    const description = await ask({ type: 'input', name: 'description', message: '  One-sentence description of your impact:' });
-    extracurriculars.push({ activityName, role, yearsInvolved, hoursPerWeek, description });
-  }
-  return { extracurriculars };
+// ─── Completion helpers ───────────────────────────────────────────────────────
+
+const SECTION_FIELDS: Record<string, string[]> = {
+  Personal:             ['gradYear', 'highSchool', 'intendedMajors'],
+  Academics:            ['gpaWeighted', 'gpaUnweighted', 'classRank', 'transcript'],
+  'Standardized Tests': ['satTotal', 'satMath', 'satReading', 'actComposite', 'apScores', 'ibScores'],
+  Extracurriculars:     ['extracurriculars'],
+  'Awards & Recognitions': ['awards'],
+};
+
+function sectionIndicator(section: string, fs: Record<string, FieldStatus>): string {
+  const fields = SECTION_FIELDS[section];
+  const statuses = fields.map(f => fs[f]);
+  if (statuses.every(s => s === 'set' || s === 'skipped')) return '✓ complete';
+  if (statuses.every(s => s === 'pending')) return '○ not started';
+  const pending = statuses.filter(s => s === 'pending').length;
+  return `● ${pending} field${pending > 1 ? 's' : ''} pending`;
 }
 
-async function collectAwards(existing?: Partial<ProfileData>): Promise<Pick<ProfileData, 'awards'>> {
-  console.log('\n── Section 5: Awards & Recognitions ─────────────────');
-  console.log('Press Enter on a blank award name when done.');
-  const awards: Award[] = existing?.awards ? [...existing.awards] : [];
-  // eslint-disable-next-line no-constant-condition
-  while (true) {
-    const awardName = await askOrSkip({ name: 'awardName', message: '  Award name:' });
-    if (!awardName) break;
-    const level = await ask({
+function allComplete(fs: Record<string, FieldStatus>): boolean {
+  const activeFields = Object.values(SECTION_FIELDS).flat();
+  return activeFields.every(f => fs[f] === 'set' || fs[f] === 'skipped');
+}
+
+function fieldLabel(key: string, data: ProfileData): string {
+  const s = data.fieldStatus[key];
+  if (s === 'skipped') return '–  skipped';
+  if (s === 'pending') return '○';
+
+  // Show inline value summary
+  switch (key) {
+    case 'gradYear':   return `✓  ${data.gradYear}`;
+    case 'highSchool': return `✓  ${data.highSchool}`;
+    case 'intendedMajors': return `✓  ${data.intendedMajors.join(', ')}`;
+    case 'gpaWeighted':    return `✓  ${data.gpaWeighted}`;
+    case 'gpaUnweighted':  return `✓  ${data.gpaUnweighted}`;
+    case 'classRank':      return `✓  ${data.classRank}`;
+    case 'transcript':     return `●  ${data.transcript.length} year${data.transcript.length !== 1 ? 's' : ''}`;
+    case 'satTotal':       return `✓  ${data.sat.total}`;
+    case 'satMath':        return `✓  ${data.sat.math}`;
+    case 'satReading':     return `✓  ${data.sat.reading}`;
+    case 'actComposite':   return `✓  ${data.act.composite}`;
+    case 'apScores':       return `●  ${data.apScores.length} subject${data.apScores.length !== 1 ? 's' : ''}`;
+    case 'ibScores':       return `●  ${data.ibScores.length} subject${data.ibScores.length !== 1 ? 's' : ''}`;
+    case 'extracurriculars': return `●  ${data.extracurriculars.length} activit${data.extracurriculars.length !== 1 ? 'ies' : 'y'}`;
+    case 'awards':           return `●  ${data.awards.length} award${data.awards.length !== 1 ? 's' : ''}`;
+    default: return '✓';
+  }
+}
+
+// ─── Scalar field editor ──────────────────────────────────────────────────────
+
+async function editScalar(
+  slug: string,
+  data: ProfileData,
+  key: string,
+  message: string,
+  current: string,
+  skippable: boolean,
+  choices?: string[],
+): Promise<void> {
+  const type = choices ? 'select' : 'input';
+  const question: Parameters<typeof ask>[0] = { type, name: 'value', message, initial: current };
+  if (choices) question.choices = choices;
+
+  if (skippable) {
+    const action = await ask({
       type: 'select',
-      name: 'level',
-      message: '  Level:',
-      choices: ['Local', 'Regional', 'State', 'National', 'International'],
+      name: 'action',
+      message,
+      choices: current ? [`Keep: ${current}`, 'Enter new value', 'Skip this field'] : ['Enter value', 'Skip this field'],
     });
-    const year = await ask({ type: 'input', name: 'year', message: '  Year received:' });
-    const description = await ask({ type: 'input', name: 'description', message: '  One-sentence description:' });
-    awards.push({ awardName, level, year, description });
+    if (action === 'Skip this field') {
+      data.fieldStatus[key] = 'skipped';
+      await saveJson(slug, data);
+      return;
+    }
+    if (action.startsWith('Keep:')) {
+      // no change
+      return;
+    }
   }
-  return { awards };
+
+  const value = await ask(question);
+  if (value.trim()) {
+    // Update the actual field
+    switch (key) {
+      case 'gradYear':    data.gradYear = value.trim(); break;
+      case 'highSchool':  data.highSchool = value.trim(); break;
+      case 'gpaWeighted': data.gpaWeighted = value.trim(); break;
+      case 'gpaUnweighted': data.gpaUnweighted = value.trim(); break;
+      case 'classRank':   data.classRank = value.trim(); break;
+      case 'satTotal':    data.sat.total = value.trim(); break;
+      case 'satMath':     data.sat.math = value.trim(); break;
+      case 'satReading':  data.sat.reading = value.trim(); break;
+      case 'actComposite': data.act.composite = value.trim(); break;
+    }
+    data.fieldStatus[key] = 'set';
+    await saveJson(slug, data);
+  }
 }
 
-async function collectPersonalStatement(existing?: Partial<ProfileData>): Promise<Pick<ProfileData, 'personalStatementSummary'>> {
-  console.log('\n── Section 6: Personal Statement (Optional) ─────────');
-  const hasDraft = await confirm('Do you have personal statement themes or key ideas to note?');
-  if (!hasDraft) return { personalStatementSummary: '' };
-  const personalStatementSummary = await ask({
-    type: 'input',
-    name: 'personalStatementSummary',
-    message: 'Brief summary or key themes (not the full essay):',
-    initial: existing?.personalStatementSummary ?? '',
+// ─── List editors ─────────────────────────────────────────────────────────────
+
+async function editIntendedMajors(slug: string, data: ProfileData): Promise<void> {
+  // eslint-disable-next-line no-constant-condition
+  while (true) {
+    const entries = data.intendedMajors;
+    const choices = [
+      ...entries.map((m, i) => `${i + 1}. ${m}`),
+      SEP,
+      'Add major / track',
+      ...(entries.length > 0 ? ['Remove a major / track'] : []),
+      'Back',
+    ];
+    const choice = await ask({ type: 'select', name: 'action', message: 'Intended Majors / Tracks', choices });
+
+    if (choice === 'Back') break;
+
+    if (choice === 'Add major / track') {
+      const val = await ask({ type: 'input', name: 'val', message: 'Major or track (e.g., Computer Science, Pre-Med):' });
+      if (val.trim()) {
+        data.intendedMajors.push(val.trim());
+        data.fieldStatus['intendedMajors'] = 'set';
+        await saveJson(slug, data);
+      }
+    } else if (choice === 'Remove a major / track') {
+      if (entries.length === 0) continue;
+      const toRemove = await ask({ type: 'select', name: 'idx', message: 'Remove which?', choices: [...entries] });
+      const idx = entries.indexOf(toRemove);
+      if (idx >= 0) {
+        data.intendedMajors.splice(idx, 1);
+        data.fieldStatus['intendedMajors'] = data.intendedMajors.length > 0 ? 'set' : 'pending';
+        await saveJson(slug, data);
+      }
+    }
+    // Selecting an existing entry — no edit for plain strings, offer remove instead
+  }
+}
+
+async function editTranscript(slug: string, data: ProfileData): Promise<void> {
+  // eslint-disable-next-line no-constant-condition
+  while (true) {
+    const years = data.transcript;
+    const choices = [
+      ...years.map((y, i) => `${i + 1}. ${y.yearLabel} (${y.courses.length} course${y.courses.length !== 1 ? 's' : ''})`),
+      SEP,
+      'Add year',
+      ...(years.length > 0 ? ['Remove a year'] : []),
+      'Skip transcript',
+      'Back',
+    ];
+    const choice = await ask({ type: 'select', name: 'action', message: 'Transcript', choices });
+
+    if (choice === 'Back') break;
+
+    if (choice === 'Skip transcript') {
+      data.fieldStatus['transcript'] = 'skipped';
+      await saveJson(slug, data);
+      break;
+    }
+
+    if (choice === 'Add year') {
+      const yearLabel = await ask({ type: 'input', name: 'yearLabel', message: 'Year label (e.g., "9th Grade"):' });
+      if (!yearLabel.trim()) continue;
+      const courses: Array<{ name: string; grade: string }> = [];
+      // eslint-disable-next-line no-constant-condition
+      while (true) {
+        const courseName = await ask({ type: 'input', name: 'course', message: '  Course name (blank to finish):' });
+        if (!courseName.trim()) break;
+        const grade = await ask({ type: 'input', name: 'grade', message: '  Letter grade:' });
+        courses.push({ name: courseName.trim(), grade: grade.trim() });
+        data.transcript = data.transcript.filter(y => y.yearLabel !== yearLabel);
+        data.transcript.push({ yearLabel: yearLabel.trim(), courses });
+        data.fieldStatus['transcript'] = 'set';
+        await saveJson(slug, data);
+      }
+    } else if (choice === 'Remove a year') {
+      const toRemove = await ask({ type: 'select', name: 'yr', message: 'Remove which year?', choices: years.map(y => y.yearLabel) });
+      data.transcript = data.transcript.filter(y => y.yearLabel !== toRemove);
+      data.fieldStatus['transcript'] = data.transcript.length > 0 ? 'set' : 'pending';
+      await saveJson(slug, data);
+    } else if (choice.includes('.')) {
+      // Selected an existing year — offer course management
+      const idx = parseInt(choice.split('.')[0]) - 1;
+      const year = data.transcript[idx];
+      if (!year) continue;
+      await editCourses(slug, data, year);
+    }
+  }
+}
+
+async function editCourses(slug: string, data: ProfileData, year: TranscriptYear): Promise<void> {
+  // eslint-disable-next-line no-constant-condition
+  while (true) {
+    const choices = [
+      ...year.courses.map((c, i) => `${i + 1}. ${c.name} — ${c.grade}`),
+      SEP,
+      'Add course',
+      ...(year.courses.length > 0 ? ['Remove a course'] : []),
+      'Back',
+    ];
+    const choice = await ask({ type: 'select', name: 'action', message: `Courses: ${year.yearLabel}`, choices });
+    if (choice === 'Back') break;
+
+    if (choice === 'Add course') {
+      const name = await ask({ type: 'input', name: 'name', message: '  Course name:' });
+      if (!name.trim()) continue;
+      const grade = await ask({ type: 'input', name: 'grade', message: '  Letter grade:' });
+      year.courses.push({ name: name.trim(), grade: grade.trim() });
+      await saveJson(slug, data);
+    } else if (choice === 'Remove a course') {
+      const toRemove = await ask({ type: 'select', name: 'c', message: 'Remove which?', choices: year.courses.map(c => `${c.name} — ${c.grade}`) });
+      const idx = year.courses.findIndex(c => `${c.name} — ${c.grade}` === toRemove);
+      if (idx >= 0) { year.courses.splice(idx, 1); await saveJson(slug, data); }
+    } else if (choice.includes('.')) {
+      const idx = parseInt(choice.split('.')[0]) - 1;
+      const course = year.courses[idx];
+      if (!course) continue;
+      const newName = await ask({ type: 'input', name: 'name', message: 'Course name:', initial: course.name });
+      const newGrade = await ask({ type: 'input', name: 'grade', message: 'Letter grade:', initial: course.grade });
+      if (newName.trim()) course.name = newName.trim();
+      if (newGrade.trim()) course.grade = newGrade.trim();
+      await saveJson(slug, data);
+    }
+  }
+}
+
+async function editScorePairs(
+  slug: string,
+  data: ProfileData,
+  key: 'apScores' | 'ibScores',
+  subjectLabel: string,
+  scoreLabel: string,
+): Promise<void> {
+  const list = data[key];
+  // eslint-disable-next-line no-constant-condition
+  while (true) {
+    const choices = [
+      ...list.map((s, i) => `${i + 1}. ${s.subject} — ${s.score}`),
+      SEP,
+      `Add ${subjectLabel}`,
+      ...(list.length > 0 ? [`Remove a ${subjectLabel}`] : []),
+      `Skip ${subjectLabel}`,
+      'Back',
+    ];
+    const choice = await ask({ type: 'select', name: 'action', message: subjectLabel, choices });
+    if (choice === 'Back') break;
+
+    if (choice.startsWith('Skip')) {
+      data.fieldStatus[key] = 'skipped';
+      await saveJson(slug, data);
+      break;
+    }
+
+    if (choice.startsWith('Add')) {
+      const subject = await ask({ type: 'input', name: 'subject', message: `  ${subjectLabel} subject:` });
+      if (!subject.trim()) continue;
+      const score = await ask({ type: 'input', name: 'score', message: `  ${scoreLabel}:` });
+      list.push({ subject: subject.trim(), score: score.trim() });
+      data.fieldStatus[key] = 'set';
+      await saveJson(slug, data);
+    } else if (choice.startsWith('Remove')) {
+      const toRemove = await ask({ type: 'select', name: 's', message: 'Remove which?', choices: list.map(s => `${s.subject} — ${s.score}`) });
+      const idx = list.findIndex(s => `${s.subject} — ${s.score}` === toRemove);
+      if (idx >= 0) {
+        list.splice(idx, 1);
+        data.fieldStatus[key] = list.length > 0 ? 'set' : 'pending';
+        await saveJson(slug, data);
+      }
+    } else if (choice.includes('.')) {
+      const idx = parseInt(choice.split('.')[0]) - 1;
+      const entry = list[idx];
+      if (!entry) continue;
+      const newSubject = await ask({ type: 'input', name: 'subject', message: `${subjectLabel} subject:`, initial: entry.subject });
+      const newScore = await ask({ type: 'input', name: 'score', message: `${scoreLabel}:`, initial: entry.score });
+      if (newSubject.trim()) entry.subject = newSubject.trim();
+      if (newScore.trim()) entry.score = newScore.trim();
+      await saveJson(slug, data);
+    }
+  }
+}
+
+async function editExtracurriculars(slug: string, data: ProfileData): Promise<void> {
+  const list = data.extracurriculars;
+  // eslint-disable-next-line no-constant-condition
+  while (true) {
+    const choices = [
+      ...list.map((e, i) => `${i + 1}. ${e.activityName} — ${e.role}`),
+      SEP,
+      'Add activity',
+      ...(list.length > 0 ? ['Edit an activity', 'Remove an activity'] : []),
+      'Skip extracurriculars',
+      'Back',
+    ];
+    const choice = await ask({ type: 'select', name: 'action', message: 'Extracurricular Activities', choices });
+    if (choice === 'Back') break;
+
+    if (choice === 'Skip extracurriculars') {
+      data.fieldStatus['extracurriculars'] = 'skipped';
+      await saveJson(slug, data);
+      break;
+    }
+
+    if (choice === 'Add activity') {
+      const entry = await collectActivityEntry();
+      list.push(entry);
+      data.fieldStatus['extracurriculars'] = 'set';
+      await saveJson(slug, data);
+    } else if (choice === 'Edit an activity') {
+      const summary = await ask({ type: 'select', name: 's', message: 'Edit which?', choices: list.map(e => `${e.activityName} — ${e.role}`) });
+      const idx = list.findIndex(e => `${e.activityName} — ${e.role}` === summary);
+      if (idx >= 0) {
+        list[idx] = await collectActivityEntry(list[idx]);
+        await saveJson(slug, data);
+      }
+    } else if (choice === 'Remove an activity') {
+      const summary = await ask({ type: 'select', name: 's', message: 'Remove which?', choices: list.map(e => `${e.activityName} — ${e.role}`) });
+      const idx = list.findIndex(e => `${e.activityName} — ${e.role}` === summary);
+      if (idx >= 0) {
+        list.splice(idx, 1);
+        data.fieldStatus['extracurriculars'] = list.length > 0 ? 'set' : 'pending';
+        await saveJson(slug, data);
+      }
+    }
+  }
+}
+
+async function collectActivityEntry(existing?: Extracurricular): Promise<Extracurricular> {
+  const activityName = await ask({ type: 'input', name: 'activityName', message: '  Activity name:', initial: existing?.activityName ?? '' });
+  const role = await ask({ type: 'input', name: 'role', message: '  Your role:', initial: existing?.role ?? '' });
+  const yearsInvolved = await ask({ type: 'input', name: 'yearsInvolved', message: '  Years involved (e.g., 2021–2024):', initial: existing?.yearsInvolved ?? '' });
+  const hoursPerWeek = await ask({ type: 'input', name: 'hoursPerWeek', message: '  Hours per week (approx):', initial: existing?.hoursPerWeek ?? '' });
+  const description = await ask({ type: 'input', name: 'description', message: '  One-sentence description of your impact:', initial: existing?.description ?? '' });
+  return { activityName: activityName.trim(), role: role.trim(), yearsInvolved: yearsInvolved.trim(), hoursPerWeek: hoursPerWeek.trim(), description: description.trim() };
+}
+
+async function editAwards(slug: string, data: ProfileData): Promise<void> {
+  const list = data.awards;
+  // eslint-disable-next-line no-constant-condition
+  while (true) {
+    const choices = [
+      ...list.map((a, i) => `${i + 1}. ${a.awardName} — ${a.level} (${a.year})`),
+      SEP,
+      'Add award',
+      ...(list.length > 0 ? ['Edit an award', 'Remove an award'] : []),
+      'Skip awards',
+      'Back',
+    ];
+    const choice = await ask({ type: 'select', name: 'action', message: 'Awards & Recognitions', choices });
+    if (choice === 'Back') break;
+
+    if (choice === 'Skip awards') {
+      data.fieldStatus['awards'] = 'skipped';
+      await saveJson(slug, data);
+      break;
+    }
+
+    if (choice === 'Add award') {
+      const entry = await collectAwardEntry();
+      list.push(entry);
+      data.fieldStatus['awards'] = 'set';
+      await saveJson(slug, data);
+    } else if (choice === 'Edit an award') {
+      const summary = await ask({ type: 'select', name: 's', message: 'Edit which?', choices: list.map(a => `${a.awardName} — ${a.level} (${a.year})`) });
+      const idx = list.findIndex(a => `${a.awardName} — ${a.level} (${a.year})` === summary);
+      if (idx >= 0) {
+        list[idx] = await collectAwardEntry(list[idx]);
+        await saveJson(slug, data);
+      }
+    } else if (choice === 'Remove an award') {
+      const summary = await ask({ type: 'select', name: 's', message: 'Remove which?', choices: list.map(a => `${a.awardName} — ${a.level} (${a.year})`) });
+      const idx = list.findIndex(a => `${a.awardName} — ${a.level} (${a.year})` === summary);
+      if (idx >= 0) {
+        list.splice(idx, 1);
+        data.fieldStatus['awards'] = list.length > 0 ? 'set' : 'pending';
+        await saveJson(slug, data);
+      }
+    }
+  }
+}
+
+async function collectAwardEntry(existing?: Award): Promise<Award> {
+  const awardName = await ask({ type: 'input', name: 'awardName', message: '  Award name:', initial: existing?.awardName ?? '' });
+  const level = await ask({ type: 'select', name: 'level', message: '  Level:', choices: ['Local', 'Regional', 'State', 'National', 'International'] });
+  const year = await ask({ type: 'input', name: 'year', message: '  Year received:', initial: existing?.year ?? '' });
+  const description = await ask({ type: 'input', name: 'description', message: '  One-sentence description:', initial: existing?.description ?? '' });
+  return { awardName: awardName.trim(), level, year: year.trim(), description: description.trim() };
+}
+
+// ─── Section menus (Level 2) ──────────────────────────────────────────────────
+
+async function sectionPersonal(slug: string, data: ProfileData): Promise<void> {
+  // eslint-disable-next-line no-constant-condition
+  while (true) {
+    const choices = [
+      `Graduation Year          ${fieldLabel('gradYear', data)}`,
+      `High School              ${fieldLabel('highSchool', data)}`,
+      `Intended Majors / Tracks ${fieldLabel('intendedMajors', data)}`,
+      SEP,
+      'Skip entire section',
+      'Back',
+    ];
+    const choice = await ask({ type: 'select', name: 'personal', message: 'Personal', choices });
+    if (choice === 'Back') break;
+
+    if (choice === 'Skip entire section') {
+      for (const f of SECTION_FIELDS['Personal']) {
+        if (data.fieldStatus[f] === 'pending') data.fieldStatus[f] = 'skipped';
+      }
+      await saveJson(slug, data);
+      break;
+    }
+
+    if (choice.startsWith('Graduation Year')) {
+      await editScalar(slug, data, 'gradYear', 'Expected graduation year (e.g., 2026):', data.gradYear, false);
+    } else if (choice.startsWith('High School')) {
+      await editScalar(slug, data, 'highSchool', 'High school name:', data.highSchool, false);
+    } else if (choice.startsWith('Intended Majors')) {
+      await editIntendedMajors(slug, data);
+    }
+  }
+}
+
+async function sectionAcademics(slug: string, data: ProfileData): Promise<void> {
+  // eslint-disable-next-line no-constant-condition
+  while (true) {
+    const choices = [
+      `GPA (Weighted)   ${fieldLabel('gpaWeighted', data)}`,
+      `GPA (Unweighted) ${fieldLabel('gpaUnweighted', data)}`,
+      `Class Rank       ${fieldLabel('classRank', data)}`,
+      `Transcript       ${fieldLabel('transcript', data)}`,
+      SEP,
+      'Skip entire section',
+      'Back',
+    ];
+    const choice = await ask({ type: 'select', name: 'academics', message: 'Academics', choices });
+    if (choice === 'Back') break;
+
+    if (choice === 'Skip entire section') {
+      for (const f of SECTION_FIELDS['Academics']) {
+        if (data.fieldStatus[f] === 'pending') data.fieldStatus[f] = 'skipped';
+      }
+      await saveJson(slug, data);
+      break;
+    }
+
+    if (choice.startsWith('GPA (Weighted)')) {
+      await editScalar(slug, data, 'gpaWeighted', 'Weighted GPA (e.g., 4.3):', data.gpaWeighted, false);
+    } else if (choice.startsWith('GPA (Unweighted)')) {
+      await editScalar(slug, data, 'gpaUnweighted', 'Unweighted GPA (e.g., 3.9):', data.gpaUnweighted, false);
+    } else if (choice.startsWith('Class Rank')) {
+      await editScalar(slug, data, 'classRank', 'Class rank (e.g., "12 of 450"):', data.classRank, true);
+    } else if (choice.startsWith('Transcript')) {
+      await editTranscript(slug, data);
+    }
+  }
+}
+
+async function sectionTests(slug: string, data: ProfileData): Promise<void> {
+  // eslint-disable-next-line no-constant-condition
+  while (true) {
+    const choices = [
+      `SAT Total        ${fieldLabel('satTotal', data)}`,
+      `SAT Math         ${fieldLabel('satMath', data)}`,
+      `SAT Reading/Writing ${fieldLabel('satReading', data)}`,
+      `ACT Composite    ${fieldLabel('actComposite', data)}`,
+      `AP Scores        ${fieldLabel('apScores', data)}`,
+      `IB Scores        ${fieldLabel('ibScores', data)}`,
+      SEP,
+      'Skip entire section',
+      'Back',
+    ];
+    const choice = await ask({ type: 'select', name: 'tests', message: 'Standardized Tests', choices });
+    if (choice === 'Back') break;
+
+    if (choice === 'Skip entire section') {
+      for (const f of SECTION_FIELDS['Standardized Tests']) {
+        if (data.fieldStatus[f] === 'pending') data.fieldStatus[f] = 'skipped';
+      }
+      await saveJson(slug, data);
+      break;
+    }
+
+    if (choice.startsWith('SAT Total'))           await editScalar(slug, data, 'satTotal', 'SAT Total score (e.g., 1520):', data.sat.total, true);
+    else if (choice.startsWith('SAT Math'))        await editScalar(slug, data, 'satMath', 'SAT Math score:', data.sat.math, true);
+    else if (choice.startsWith('SAT Reading'))     await editScalar(slug, data, 'satReading', 'SAT Evidence-Based Reading & Writing score:', data.sat.reading, true);
+    else if (choice.startsWith('ACT Composite'))   await editScalar(slug, data, 'actComposite', 'ACT Composite score (e.g., 34):', data.act.composite, true);
+    else if (choice.startsWith('AP Scores'))       await editScorePairs(slug, data, 'apScores', 'AP Scores', 'Score (1–5)');
+    else if (choice.startsWith('IB Scores'))       await editScorePairs(slug, data, 'ibScores', 'IB Scores', 'Predicted/Final score');
+  }
+}
+
+async function sectionExtracurriculars(slug: string, data: ProfileData): Promise<void> {
+  await editExtracurriculars(slug, data);
+}
+
+async function sectionAwards(slug: string, data: ProfileData): Promise<void> {
+  await editAwards(slug, data);
+}
+
+// ─── LLM Enhancement (C02-F04) ───────────────────────────────────────────────
+
+async function enhanceProfile(data: ProfileData): Promise<ProfileData> {
+  const genAI = new GoogleGenerativeAI(getGeminiApiKey());
+  const model = genAI.getGenerativeModel({ model: getGeminiModel(), generationConfig: { temperature: 0.2 } });
+
+  const prompt = await loadPrompt('c02-profile-enhance', {
+    PROFILE_JSON: JSON.stringify(data, null, 2),
   });
-  return { personalStatementSummary };
+
+  async function attempt(): Promise<ProfileData> {
+    const result = await model.generateContent(prompt);
+    const raw = result.response.text().trim();
+    const jsonStr = raw.replace(/^```(?:json)?\n?/, '').replace(/\n?```$/, '').trim();
+    return JSON.parse(jsonStr) as ProfileData;
+  }
+
+  try {
+    return await attempt();
+  } catch {
+    console.log('Retrying enhancement in 30 seconds...');
+    await new Promise(r => setTimeout(r, 30000));
+    try {
+      return await attempt();
+    } catch {
+      console.log('Profile enhancement unavailable — saved with original text.');
+      return data;
+    }
+  }
 }
 
-// ─── Markdown Rendering ───────────────────────────────────────────────────────
+// ─── Markdown rendering ───────────────────────────────────────────────────────
 
 function renderProfileMarkdown(data: ProfileData): string {
-  const now = data.lastUpdated;
   const lines: string[] = [];
 
   lines.push(`# Student Profile: ${data.name}`);
   lines.push('');
   lines.push(`**Generated:** ${data.generatedDate}`);
-  lines.push(`**Last Updated:** ${now}`);
+  lines.push(`**Last Updated:** ${data.lastUpdated}`);
   lines.push('');
   lines.push('---');
   lines.push('');
@@ -227,8 +683,8 @@ function renderProfileMarkdown(data: ProfileData): string {
   lines.push('| Field | Value |');
   lines.push('| :---- | :---- |');
   lines.push(`| Full Name | ${data.name} |`);
-  lines.push(`| Graduation Year | ${data.gradYear} |`);
-  lines.push(`| High School | ${data.highSchool} |`);
+  lines.push(`| Graduation Year | ${data.gradYear || 'Not provided'} |`);
+  lines.push(`| High School | ${data.highSchool || 'Not provided'} |`);
   lines.push(`| Intended Majors / Tracks | ${data.intendedMajors.length > 0 ? data.intendedMajors.join(', ') : 'Not provided'} |`);
   lines.push('');
   lines.push('---');
@@ -237,8 +693,8 @@ function renderProfileMarkdown(data: ProfileData): string {
   lines.push('');
   lines.push('| Metric | Value |');
   lines.push('| :----- | :---- |');
-  lines.push(`| GPA (Weighted) | ${data.gpaWeighted} |`);
-  lines.push(`| GPA (Unweighted) | ${data.gpaUnweighted} |`);
+  lines.push(`| GPA (Weighted) | ${data.gpaWeighted || 'Not provided'} |`);
+  lines.push(`| GPA (Unweighted) | ${data.gpaUnweighted || 'Not provided'} |`);
   lines.push(`| Class Rank | ${data.classRank || 'Not provided'} |`);
   lines.push('');
   lines.push('### Transcript');
@@ -276,20 +732,14 @@ function renderProfileMarkdown(data: ProfileData): string {
   lines.push('### AP Scores');
   lines.push('| Subject | Score |');
   lines.push('| :------ | :---- |');
-  if (data.apScores.length === 0) {
-    lines.push('| — | — |');
-  } else {
-    for (const ap of data.apScores) lines.push(`| ${ap.subject} | ${ap.score} |`);
-  }
+  if (data.apScores.length === 0) lines.push('| — | — |');
+  else for (const ap of data.apScores) lines.push(`| ${ap.subject} | ${ap.score} |`);
   lines.push('');
   lines.push('### IB Scores');
   lines.push('| Subject | Score |');
   lines.push('| :------ | :---- |');
-  if (data.ibScores.length === 0) {
-    lines.push('| — | — |');
-  } else {
-    for (const ib of data.ibScores) lines.push(`| ${ib.subject} | ${ib.score} |`);
-  }
+  if (data.ibScores.length === 0) lines.push('| — | — |');
+  else for (const ib of data.ibScores) lines.push(`| ${ib.subject} | ${ib.score} |`);
   lines.push('');
   lines.push('---');
   lines.push('');
@@ -321,194 +771,109 @@ function renderProfileMarkdown(data: ProfileData): string {
   lines.push('');
   lines.push('---');
   lines.push('');
-  lines.push('## Personal Statement');
-  lines.push('');
-  lines.push('**Key Themes / Summary:**');
-  lines.push(data.personalStatementSummary || 'Not provided');
-  lines.push('');
 
   return lines.join('\n');
 }
 
-// ─── Parse existing profile back to ProfileData ───────────────────────────────
+// ─── Main menu (Level 1) ──────────────────────────────────────────────────────
 
-function parseExistingProfile(content: string): Partial<ProfileData> {
-  const partial: Partial<ProfileData> = {};
+async function mainMenu(slug: string, data: ProfileData): Promise<void> {
+  const sections = Object.keys(SECTION_FIELDS);
 
-  const fieldMatch = (label: string) => {
-    const re = new RegExp(`\\|\\s*${label}\\s*\\|\\s*([^|\\n]+)\\|`);
-    const m = content.match(re);
-    return m ? m[1].trim() : '';
-  };
+  // eslint-disable-next-line no-constant-condition
+  while (true) {
+    const complete = allComplete(data.fieldStatus);
+    const choices = [
+      ...sections.map(s => `${s.padEnd(28)} ${sectionIndicator(s, data.fieldStatus)}`),
+      { role: 'separator', value: '─────────────────────────────────────' },
+      complete ? 'Finalize & Save' : 'Finalize & Save  (disabled — complete all sections first)',
+      'Quit without saving',
+    ];
 
-  partial.name = fieldMatch('Full Name');
-  partial.gradYear = fieldMatch('Graduation Year');
-  partial.highSchool = fieldMatch('High School');
-  const majorsRaw = fieldMatch('Intended Majors / Tracks');
-  partial.intendedMajors = majorsRaw && majorsRaw !== 'Not provided'
-    ? majorsRaw.split(',').map(m => m.trim()).filter(Boolean)
-    : [];
-  partial.gpaWeighted = fieldMatch('GPA \\(Weighted\\)');
-  partial.gpaUnweighted = fieldMatch('GPA \\(Unweighted\\)');
-  const classRankRaw = fieldMatch('Class Rank');
-  partial.classRank = classRankRaw === 'Not provided' ? '' : classRankRaw;
+    const choice = await ask({
+      type: 'select',
+      name: 'section',
+      message: `Student Profile: ${data.name}`,
+      choices,
+    });
 
-  // Generated/updated dates
-  const genMatch = content.match(/\*\*Generated:\*\*\s*([^\n]+)/);
-  if (genMatch) partial.generatedDate = genMatch[1].trim();
-  const updMatch = content.match(/\*\*Last Updated:\*\*\s*([^\n]+)/);
-  if (updMatch) partial.lastUpdated = updMatch[1].trim();
+    if (choice === 'Quit without saving') {
+      console.log('No changes saved to profile.md.');
+      return;
+    }
 
-  // Personal statement
-  const psMatch = content.match(/\*\*Key Themes \/ Summary:\*\*\n([\s\S]+?)(?:\n---|\n$|$)/);
-  const psText = psMatch ? psMatch[1].trim() : '';
-  partial.personalStatementSummary = psText === 'Not provided' ? '' : psText;
+    if (choice === 'Finalize & Save') {
+      if (!complete) {
+        console.log('Please complete or skip all sections before finalizing.');
+        continue;
+      }
+      data.lastUpdated = new Date().toISOString().split('T')[0];
+      await saveJson(slug, data);
+      console.log('Enhancing your profile...');
+      const enhanced = await enhanceProfile(data);
+      const markdown = renderProfileMarkdown(enhanced);
+      await writeFile(mdPath(slug), markdown);
+      console.log(`Profile saved: data/students/${slug}/profile.md`);
+      return;
+    }
 
-  // Transcript, extracurriculars, awards, and test scores are complex to re-parse
-  // Keep existing data as-is — update flow rebuilds only the selected section
-  partial.transcript = [];
-  partial.extracurriculars = [];
-  partial.awards = [];
-  partial.apScores = [];
-  partial.ibScores = [];
-  partial.sat = { total: '', math: '', reading: '' };
-  partial.act = { composite: '' };
+    // Disabled finalize selected — ignore
+    if (choice.startsWith('Finalize & Save  (disabled')) continue;
 
-  return partial;
+    // Section selected
+    const section = sections.find(s => choice.startsWith(s));
+    if (!section) continue;
+
+    switch (section) {
+      case 'Personal':             await sectionPersonal(slug, data); break;
+      case 'Academics':            await sectionAcademics(slug, data); break;
+      case 'Standardized Tests':   await sectionTests(slug, data); break;
+      case 'Extracurriculars':     await sectionExtracurriculars(slug, data); break;
+      case 'Awards & Recognitions': await sectionAwards(slug, data); break;
+    }
+  }
 }
 
 // ─── Public API ───────────────────────────────────────────────────────────────
 
-// [C02-F01, C02-F02] Build or update a student profile
+// [C02-F01, C02-F02] Build or resume a student profile via nested menu
 export async function buildStudentProfile(nameSlug?: string): Promise<{ profilePath: string }> {
-  let profilePath: string;
-  let existing: Partial<ProfileData> | undefined;
-  let isUpdate = false;
+  let slug = nameSlug;
+  let data: ProfileData;
 
-  // Determine student name and directory
-  let resolvedSlug = nameSlug;
-
-  if (resolvedSlug) {
-    profilePath = dataPath(resolvedSlug, 'profile.md');
-    if (await fileExists(profilePath)) {
-      isUpdate = true;
-      const content = await readFile(profilePath);
-      existing = parseExistingProfile(content);
-      const doUpdate = await confirm(`Profile already exists for "${resolvedSlug}". Update a section?`);
-      if (!doUpdate) {
-        console.log('No changes made.');
-        return { profilePath };
-      }
-    }
-  } else {
-    // Name not provided — collect it as the first step
-    const nameResult = await ask({ type: 'input', name: 'name', message: 'Your full legal name:' });
-    resolvedSlug = toSlug(nameResult);
-    profilePath = dataPath(resolvedSlug, 'profile.md');
-    if (await fileExists(profilePath)) {
-      isUpdate = true;
-      const content = await readFile(profilePath);
-      existing = parseExistingProfile(content);
-      const doUpdate = await confirm(`Profile already exists for "${resolvedSlug}". Update a section?`);
-      if (!doUpdate) {
-        console.log('No changes made.');
-        return { profilePath };
-      }
+  if (slug) {
+    const jp = jsonPath(slug);
+    if (await fileExists(jp)) {
+      console.log('Resuming student profile...');
+      data = JSON.parse(await readFile(jp)) as ProfileData;
     } else {
-      // Pre-fill name from what was just collected
-      existing = { name: nameResult };
-    }
-  }
-
-  const now = new Date().toISOString().split('T')[0];
-  const generatedDate = existing?.generatedDate ?? now;
-
-  let data: ProfileData = {
-    name: existing?.name ?? '',
-    gradYear: existing?.gradYear ?? '',
-    highSchool: existing?.highSchool ?? '',
-    intendedMajors: existing?.intendedMajors ?? [],
-    gpaWeighted: existing?.gpaWeighted ?? '',
-    gpaUnweighted: existing?.gpaUnweighted ?? '',
-    classRank: existing?.classRank ?? '',
-    transcript: existing?.transcript ?? [],
-    sat: existing?.sat ?? { total: '', math: '', reading: '' },
-    act: existing?.act ?? { composite: '' },
-    apScores: existing?.apScores ?? [],
-    ibScores: existing?.ibScores ?? [],
-    extracurriculars: existing?.extracurriculars ?? [],
-    awards: existing?.awards ?? [],
-    personalStatementSummary: existing?.personalStatementSummary ?? '',
-    generatedDate,
-    lastUpdated: now,
-  };
-
-  if (isUpdate) {
-    // [C02-F02] Section-by-section update
-    const section = await ask({
-      type: 'select',
-      name: 'section',
-      message: 'Which section would you like to update?',
-      choices: ['Personal', 'Academics', 'Standardized Tests', 'Extracurriculars', 'Awards & Recognitions', 'Personal Statement'],
-    });
-
-    switch (section) {
-      case 'Personal': {
-        const p = await collectPersonal(data);
-        data = { ...data, ...p };
-        break;
-      }
-      case 'Academics': {
-        const a = await collectAcademics(data);
-        data = { ...data, ...a };
-        break;
-      }
-      case 'Standardized Tests': {
-        const t = await collectTests(data);
-        data = { ...data, ...t };
-        break;
-      }
-      case 'Extracurriculars': {
-        const e = await collectExtracurriculars(data);
-        data = { ...data, ...e };
-        break;
-      }
-      case 'Awards & Recognitions': {
-        const aw = await collectAwards(data);
-        data = { ...data, ...aw };
-        break;
-      }
-      case 'Personal Statement': {
-        const ps = await collectPersonalStatement(data);
-        data = { ...data, ...ps };
-        break;
-      }
+      // New profile — name not yet in data
+      const nameInput = await ask({ type: 'input', name: 'name', message: 'Your full legal name:' });
+      data = emptyProfile(nameInput.trim(), slug);
+      data.name = nameInput.trim();
+      await saveJson(slug, data);
     }
   } else {
-    // [C02-F01] Full wizard
-    const personal = await collectPersonal(existing);
-    data = { ...data, ...personal };
-    const academics = await collectAcademics(existing);
-    data = { ...data, ...academics };
-    const tests = await collectTests(existing);
-    data = { ...data, ...tests };
-    const ec = await collectExtracurriculars(existing);
-    data = { ...data, ...ec };
-    const awards = await collectAwards(existing);
-    data = { ...data, ...awards };
-    const ps = await collectPersonalStatement(existing);
-    data = { ...data, ...ps };
+    const nameInput = await ask({ type: 'input', name: 'name', message: 'Your full legal name:' });
+    slug = toSlug(nameInput.trim());
+    const jp = jsonPath(slug);
+    if (await fileExists(jp)) {
+      console.log('Resuming student profile...');
+      data = JSON.parse(await readFile(jp)) as ProfileData;
+    } else {
+      console.log('Building student profile...');
+      data = emptyProfile(nameInput.trim(), slug);
+      await saveJson(slug, data);
+    }
   }
 
-  // [C02-F04] Write markdown
-  const markdown = renderProfileMarkdown(data);
-  await writeFile(profilePath, markdown);
-  return { profilePath };
+  await mainMenu(slug, data);
+  return { profilePath: mdPath(slug) };
 }
 
 // [C02-F03] Show stored student profile
 export async function showStudentProfile(nameSlug: string): Promise<{ markdownPath: string }> {
-  const markdownPath = dataPath(nameSlug, 'profile.md');
+  const markdownPath = mdPath(nameSlug);
   if (!(await fileExists(markdownPath))) {
     throw new Error(`No profile found for "${nameSlug}". Run: ao --student-profile --build --name ${nameSlug}`);
   }
