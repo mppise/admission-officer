@@ -1,0 +1,24 @@
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+
+# Environment variables — never commit
+.env
+
+# Data directory (student/university profiles are personal)
+data/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Playwright / Puppeteer browser downloads (auto-managed)
+.playwright/

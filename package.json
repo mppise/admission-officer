@@ -1,0 +1,49 @@
+{
+  "name": "admission-officer",
+  "version": "1.0.0",
+  "description": "Admissions Officer CLI — personalised college admissions guidance for high school students",
+  "type": "module",
+  "bin": {
+    "ao": "dist/cli/index.js"
+  },
+  "scripts": {
+    "build": "tsc && mkdir -p dist/ai/prompts && cp src/ai/prompts/*.md dist/ai/prompts/ && mkdir -p dist/components/c06-pdf-exporter/styles && cp src/components/c06-pdf-exporter/styles/*.css dist/components/c06-pdf-exporter/styles/ && chmod +x dist/cli/index.js",
+    "prepare": "npm run build",
+    "start": "node dist/cli/index.js",
+    "typecheck": "tsc --noEmit",
+    "postinstall": "playwright install chromium"
+  },
+  "files": [
+    "dist/",
+    "README.md"
+  ],
+  "keywords": [
+    "college-admissions",
+    "university",
+    "guidance",
+    "essay",
+    "cli",
+    "ai"
+  ],
+  "author": "Mangesh Pise",
+  "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/mppise/ao.git"
+  },
+  "dependencies": {
+    "@google/generative-ai": "^0.21.0",
+    "commander": "^12.1.0",
+    "dotenv": "^16.4.5",
+    "enquirer": "^2.4.1",
+    "marked": "^12.0.0",
+    "playwright": "^1.44.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.14.0",
+    "typescript": "^5.5.2"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  }
+}

@@ -1,0 +1,140 @@
+/* ao PDF stylesheet — inlined into HTML template before Puppeteer rendering */
+
+body {
+  font-family: Georgia, serif;
+  font-size: 11pt;
+  line-height: 1.6;
+  max-width: 100%;
+  margin: 0;
+  padding: 0;
+  color: #1a1a1a;
+}
+
+.ao-document {
+  padding: 0;
+}
+
+h1 {
+  font-size: 18pt;
+  font-weight: bold;
+  border-bottom: 2px solid #333;
+  padding-bottom: 0.3em;
+  margin-top: 0;
+  margin-bottom: 0.5em;
+}
+
+h2 {
+  font-size: 14pt;
+  font-weight: bold;
+  margin-top: 1.5em;
+  margin-bottom: 0.4em;
+  page-break-after: avoid;
+}
+
+h3 {
+  font-size: 12pt;
+  font-weight: bold;
+  margin-top: 1em;
+  margin-bottom: 0.3em;
+  page-break-after: avoid;
+}
+
+h4 {
+  font-size: 11pt;
+  font-weight: bold;
+  margin-top: 0.8em;
+  margin-bottom: 0.2em;
+}
+
+p {
+  margin-top: 0.4em;
+  margin-bottom: 0.6em;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-bottom: 1em;
+  page-break-inside: avoid;
+}
+
+th {
+  background-color: #f0f0f0;
+  font-weight: bold;
+  text-align: left;
+  padding: 6px 10px;
+  border: 1px solid #ccc;
+}
+
+td {
+  padding: 5px 10px;
+  border: 1px solid #ccc;
+  vertical-align: top;
+}
+
+tr:nth-child(even) td {
+  background-color: #fafafa;
+}
+
+blockquote {
+  border-left: 4px solid #ccc;
+  font-style: italic;
+  padding-left: 1em;
+  margin-left: 0;
+  margin-right: 0;
+  color: #444;
+  page-break-inside: avoid;
+}
+
+code {
+  font-family: 'Courier New', monospace;
+  background-color: #f8f8f8;
+  padding: 1px 4px;
+  border-radius: 2px;
+  font-size: 10pt;
+}
+
+pre {
+  background-color: #f8f8f8;
+  padding: 0.8em;
+  border-radius: 3px;
+  overflow: visible;
+  white-space: pre-wrap;
+  word-break: break-word;
+  font-size: 10pt;
+  page-break-inside: avoid;
+}
+
+a {
+  color: #000;
+  text-decoration: none;
+}
+
+ul, ol {
+  margin-top: 0.3em;
+  margin-bottom: 0.6em;
+  padding-left: 1.5em;
+}
+
+li {
+  margin-bottom: 0.2em;
+}
+
+hr {
+  border: none;
+  border-top: 1px solid #ddd;
+  margin: 1.5em 0;
+}
+
+strong {
+  font-weight: bold;
+}
+
+em {
+  font-style: italic;
+}
+
+/* Prevent awkward page breaks */
+h2 + * { page-break-before: avoid; }
+table { page-break-inside: avoid; }
+blockquote { page-break-inside: avoid; }

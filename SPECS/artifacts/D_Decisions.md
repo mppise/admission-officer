@@ -1,0 +1,88 @@
+---
+name: decisions
+description: Living register of all decisions made during specification. Review and mark each as approved [X], rejected [-], deferred [>], or pending [ ].
+license: Apache-2.0 (see LICENSE in project root)
+---
+
+# Decisions
+
+> A decision left unreviewed blocks dependent work or, worse, lets it proceed on a rejected choice.
+> This register must be reviewed and all blocking decisions resolved before dependent implementation begins.
+>
+> **Status codes:** `[ ]` Pending · `[X]` Approved · `[-]` Rejected · `[>]` Deferred
+>
+> **Decision types:** `ARCH` Architecture · `TECH` Technology / Library · `PRODUCT` Product / UX · `DATA` Data & Storage · `SEC` Security · `OPS` Operations · `COMPLIANCE` Compliance & Legal
+
+---
+
+## Summary
+
+| Total | Pending `[ ]` | Approved `[X]` | Rejected `[-]` | Deferred `[>]` |
+| :---: | :-----------: | :------------: | :------------: | :------------: |
+| 11 | 0 | 11 | 0 | 0 |
+
+---
+
+## Architecture
+
+| Status | ID | Decision | Rationale | Alternatives Rejected | Impact | Owner | Notes |
+| :----: | :- | :------- | :-------- | :-------------------- | :----- | :---- | :---- |
+| `[X]` | D-ARCH-AO000001 | Six-component architecture: C01 CLI Shell, C02 Student Profile, C03 University Profile, C04 Guidance Engine, C05 Essay Advisor, C06 PDF Exporter | Clean separation of concerns; each command maps to one component | Monolithic single-file approach (unmaintainable), microservices (overkill for CLI) | All component specs must align to this decomposition | DevAgent | Confirmed during Planning |
+| `[X]` | D-ARCH-AO000002 | Prerequisite enforcement at C01 CLI Shell layer | Single enforcement point; components may assume prerequisites are met | Each component checking independently (redundant, inconsistent UX) | C03, C04, C05 can omit prerequisite logic | DevAgent | Confirmed during Planning |
+| `[X]` | D-ARCH-AO000003 | Local-only file-backed persistence using markdown | Student data is sensitive; no cloud requirement; markdown is human-readable and diffable | SQLite (overkill), cloud storage (out of scope) | No sync, no multi-device, no backup for MVP | DevAgent | Confirmed during Planning |
+| `[X]` | D-ARCH-AO000004 | Google Gemini API for all AI generation (C03 extraction, C04 guidance, C05 essay) | Selected by DevAgent; natural language reasoning over structured profile data | OpenAI (not selected), rule/template engine (insufficient quality) | Requires internet + valid API key for C03, C04, C05 | DevAgent | Confirmed during Ideation |
+
+## Technology & Libraries
+
+> 📦 Approved entries here constitute the permitted library list for development.
+> No library may be used in code unless it appears in this section with status `[X]`.
+
+| Status | ID | Decision | Rationale | Alternatives Rejected | Impact | Owner | Notes |
+| :----: | :- | :------- | :-------- | :-------------------- | :----- | :---- | :---- |
+| `[X]` | D-TECH-AO000001 | TypeScript 5.x with ESM (`"module": "NodeNext"`) | Type safety; ESM is TypeScript's natural output target; NodeNext resolution is correct for Node 20 | Plain JavaScript (no type safety), CommonJS (legacy, worse ESM interop) | All imports use `.js` extensions; `tsconfig.json` required | DevAgent | Confirmed during Planning |
+| `[X]` | D-TECH-AO000002 | `commander` for CLI framework | Mature, well-typed, supports subcommands and flags natively | `yargs` (verbose API), `meow` (too minimal for complex flags) | All flag parsing goes through commander | DevAgent | Confirmed during Planning |
+| `[X]` | D-TECH-AO000003 | `enquirer` for interactive wizard prompts | Richer prompt types (multi-select, scales, autocomplete); clean ESM support; better visual polish than inquirer | `inquirer` (ESM friction in v9+, heavier), `prompts` (less feature-rich) | Used exclusively in C02 and C03 wizard flows | DevAgent | Confirmed during Planning |
+| `[X]` | D-TECH-AO000004 | `playwright` (headless Chromium) for university website scraping | University websites are predominantly JS-rendered SPAs; static parsers miss dynamic content | `cheerio` (fails on JS-rendered content), `scrapy` (Python) | ~100MB browser binary; slower cold start for `--university-profile --build` | DevAgent | Confirmed during Planning |
+| `[X]` | D-TECH-AO000005 | `@google/generative-ai` as Gemini SDK | Official SDK; handles auth, retries, and response parsing | Raw `fetch` (no type safety, manual auth) | All Gemini calls go through this SDK | DevAgent | Confirmed during Planning |
+| `[X]` | D-TECH-AO000006 | `puppeteer` for PDF export | HTML→PDF rendering; no external service; well-maintained | `markdown-pdf` (unmaintained), `weasyprint` (Python dependency) | Used exclusively in C06; markdown→HTML→PDF pipeline via `marked` + `puppeteer` | DevAgent | Confirmed during Planning |
+| `[X]` | D-TECH-AO000007 | `dotenv` for environment/config loading | Standard `.env` loading; zero config | Custom env parser (unnecessary) | `GEMINI_API_KEY` and `GEMINI_MODEL` loaded from `.env` at startup | DevAgent | Confirmed during Planning |
+
+## Product & UX
+
+| Status | ID | Decision | Rationale | Alternatives Rejected | Impact | Owner | Notes |
+| :----: | :- | :------- | :-------- | :-------------------- | :----- | :---- | :---- |
+
+## Data & Storage
+
+| Status | ID | Decision | Rationale | Alternatives Rejected | Impact | Owner | Notes |
+| :----: | :- | :------- | :-------- | :-------------------- | :----- | :---- | :---- |
+
+## Security
+
+| Status | ID | Decision | Rationale | Alternatives Rejected | Impact | Owner | Notes |
+| :----: | :- | :------- | :-------- | :-------------------- | :----- | :---- | :---- |
+
+## Operations & Deployment
+
+| Status | ID | Decision | Rationale | Alternatives Rejected | Impact | Owner | Notes |
+| :----: | :- | :------- | :-------- | :-------------------- | :----- | :---- | :---- |
+
+## Compliance & Legal
+
+| Status | ID | Decision | Rationale | Alternatives Rejected | Impact | Owner | Notes |
+| :----: | :- | :------- | :-------- | :-------------------- | :----- | :---- | :---- |
+
+---
+
+## Rejected Decisions Log
+
+| ID | Decision | Rejected by | Date | Reason | Superseded by |
+| :- | :------- | :---------- | :--: | :----- | :------------ |
+
+---
+
+## Change History
+
+| ID | Description | Date | Author |
+| :- | :---------- | :--: | :----- |
+| CHG-001 | Initial decisions logged during Planning | 2026-05-24 | SpecGantry |
