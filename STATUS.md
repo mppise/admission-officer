@@ -8,7 +8,7 @@ license: Apache-2.0 (see LICENSE in project root)
 # Project Status
 
 > **Overall health:** 🟢 On Track
-> **Last updated:** 2026-05-24
+> **Last updated:** 2026-05-25
 > **Active phase:** Deployment Readiness
 
 ---
@@ -21,7 +21,7 @@ license: Apache-2.0 (see LICENSE in project root)
 | Planning | ✅ | 2026-05-24 | 2026-05-24 | SpecGantry | B_Architecture.md finalized; 11 decisions approved; 5 risks accepted |
 | Detailed Design | ✅ | 2026-05-24 | 2026-05-24 | SpecGantry | All 6 components specified and ready |
 | Development | ✅ | 2026-05-24 | 2026-05-24 | SpecGantry | All 6 components implemented; tsc clean |
-| Deployment Readiness | ✅ | 2026-05-25 | 2026-05-25 | SpecGantry | Audit PASS — 0 SEV-1/SEV-2; go.sh ready |
+| Deployment Readiness | ✅ | 2026-05-25 | 2026-05-25 | SpecGantry | v1.0.1 audit `rel_2026.05.25.1130` PASS — patch release; 0 SEV-1/SEV-2; go.sh unchanged (version-agnostic) |
 
 > **Status key:** ⬜ Not started · 🔄 In progress · ✅ Complete · 🔴 Blocked
 
@@ -47,7 +47,7 @@ license: Apache-2.0 (see LICENSE in project root)
 
 | **Date** | **Phase** | **Component** | **Change summary** | **Impact** | **Decision ref** | **Assumption ref** |
 | :------- | :-------- | :------------ | :----------------- | :--------- | :--------------- | :----------------- |
-| | | | | | | |
+| 2026-05-25 | Deployment Readiness | C06 PDF Exporter | `puppeteer` missing from `package.json` dependencies caused clean-install build to fail (TS2307). Manifest patched: added `puppeteer@^23.11.1`; `postinstall` now installs both Playwright and Puppeteer Chromium binaries. Code and specs unchanged. Prior audit `rel_2026.05.25.1500` superseded by `rel_2026.05.25.1123`. | Manifest-only; no `./src/` or spec changes; first-install footprint grows by ~150 MB | D-TECH-AO000006 | A-EX-AOIDEATE1 |
 
 ---
 
@@ -65,7 +65,8 @@ license: Apache-2.0 (see LICENSE in project root)
 
 | **Version** | **Status** | **Deployment ready on** | **Deployed on** | **Notes** |
 | :---------- | :--------: | :---------------------: | :-------------: | :-------- |
-| v1.0.0 | [X] Active — Ready to Deploy | 2026-05-25 | | Initial public release — all 6 components, npm package admission-officer |
+| v1.0.0 | [-] Deprecated | 2026-05-25 | 2026-05-25 | Published broken — missing `puppeteer` in `package.json`. Superseded by v1.0.1. Audit `rel_2026.05.25.1123`. |
+| v1.0.1 | [X] Active — Ready to Deploy | 2026-05-25 | | Patch release — adds `puppeteer@^23.11.1` dependency and chained Chromium postinstall. No `./src/` or spec changes. Audit `rel_2026.05.25.1130` PASS. |
 
 ---
 

@@ -1,6 +1,6 @@
 {
   "name": "admission-officer",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Admissions Officer CLI — personalised college admissions guidance for high school students",
   "type": "module",
   "bin": {
@@ -11,7 +11,7 @@
     "prepare": "npm run build",
     "start": "node dist/cli/index.js",
     "typecheck": "tsc --noEmit",
-    "postinstall": "playwright install chromium"
+    "postinstall": "playwright install chromium && puppeteer browsers install chrome"
   },
   "files": [
     "dist/",
@@ -37,7 +37,8 @@
     "dotenv": "^16.4.5",
     "enquirer": "^2.4.1",
     "marked": "^12.0.0",
-    "playwright": "^1.44.0"
+    "playwright": "^1.44.0",
+    "puppeteer": "^23.11.1"
   },
   "devDependencies": {
     "@types/node": "^20.14.0",
