@@ -1033,6 +1033,20 @@ async function mainMenu(slug: string, data: ProfileData): Promise<void> {
   }
 }
 
+// Merge a parsed (possibly legacy) profile.json over a fresh emptyProfile shape
+// so any fields absent from older saves take their empty defaults. Heals files
+// written before later schema additions (e.g., F06 shadowing, F07 research).
+function migrateProfile(parsed: Partial<ProfileData>): ProfileData {
+  const base = emptyProfile(parsed.name ?? '');
+  return {
+    ...base,
+    ...parsed,
+    sat: { ...base.sat, ...(parsed.sat ?? {}) },
+    act: { ...base.act, ...(parsed.act ?? {}) },
+    fieldStatus: { ...base.fieldStatus, ...(parsed.fieldStatus ?? {}) },
+  };
+}
+
 // ─── Public API ───────────────────────────────────────────────────────────────
 
 // [C02-F01, C02-F02] Build or resume a student profile via full-screen ink menu
@@ -1044,7 +1058,7 @@ export async function buildStudentProfile(nameSlug?: string): Promise<{ profileP
     const jp = jsonPath(slug);
     if (await fileExists(jp)) {
       console.log('Resuming student profile...');
-      data = JSON.parse(await readFile(jp)) as ProfileData;
+      data = migrateProfile(JSON.parse(await readFile(jp)) as Partial<ProfileData>);
     } else {
       const nameInput = await waitForText('Your full legal name:', '', 'Student Profile', '');
       data = emptyProfile(nameInput.trim());
@@ -1057,7 +1071,7 @@ export async function buildStudentProfile(nameSlug?: string): Promise<{ profileP
     const jp = jsonPath(slug);
     if (await fileExists(jp)) {
       console.log('Resuming student profile...');
-      data = JSON.parse(await readFile(jp)) as ProfileData;
+      data = migrateProfile(JSON.parse(await readFile(jp)) as Partial<ProfileData>);
     } else {
       console.log('Building student profile...');
       data = emptyProfile(nameInput.trim());

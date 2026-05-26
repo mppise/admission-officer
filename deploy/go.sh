@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# deploy/go.sh — builds and publishes admission-officer to npmjs
+# deploy/go.sh — builds and publishes university-admission-officer to npmjs
 #
 # Deployment model: npm package (no containerisation — local CLI tool per B_Architecture.md §12.2)
 # Usage:
@@ -124,7 +124,7 @@ else
     echo "  │  Instructions:                                  │"
     echo "  │  1. Log in to npmjs.com if prompted             │"
     echo "  │  2. Set an expiration (or choose 'No expiry')   │"
-    echo "  │  3. Under Packages: select 'admission-officer'  │"
+    echo "  │  3. Under Packages: select 'university-admission-officer'  │"
     echo "  │  4. Set permission to 'Read and write'          │"
     echo "  │  5. Click 'Generate token'                      │"
     echo "  │  6. Copy the token (starts with npm_...)        │"

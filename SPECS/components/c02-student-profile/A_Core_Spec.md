@@ -11,14 +11,16 @@ Collects a student's holistic academic and extracurricular profile through a nes
 | Status | ID | Description | Priority | Req Ref | Doc Level |
 | :----- | :- | :---------- | :------- | :------ | :-------- |
 | `Complete` | C02-F01 | Navigate and edit the student profile via a full-screen ink-based TUI; track completion status per field/section; gate finalization until all fields are `set` or `skipped` | P1 | REQ-0001, REQ-0002 | - |
-| `Complete` | C02-F02 | Load existing `profile.json` on re-entry; resume the full-screen menu with current values pre-filled and completion indicators intact | P1 | REQ-0001 | - |
+| `Revised` | C02-F02 | Load existing `profile.json` on re-entry; resume the full-screen menu with current values pre-filled and completion indicators intact. Parsed JSON is merged over a fresh `emptyProfile()` so any newly-added fields (e.g., `shadowing`, `research`) default to safe empty values on older saved profiles. | P1 | REQ-0001 | - |
 | `Complete` | C02-F03 | Display the stored student profile markdown to stdout | P1 | REQ-0003 | - |
 | `Complete` | C02-F04 | On Finalize: enhance all text fields via Gemini (honest student voice, no marketing tone), then generate `profile.md` from enhanced data — raw `profile.json` is never modified | P1 | REQ-0013 | - |
 | `Complete` | C02-F05 | Write `profile.json` after every individual field input — never lose data mid-session | P1 | REQ-0001 | - |
-| `Complete` | C02-F06 | Capture shadowing experiences (organization, field, hours, period, description) via list management TUI; skippable per entry and as a whole section | P2 | REQ-0001 | - |
-| `Complete` | C02-F07 | Capture research experiences (project title, institution, mentor, period, hours/week, description) via list management TUI; skippable per entry and as a whole section | P2 | REQ-0001 | - |
+| `Revised` | C02-F06 | Capture shadowing experiences (organization, field, hours, period, description) via list management TUI; skippable per entry and as a whole section | P2 | REQ-0001 | - |
+| `Revised` | C02-F07 | Capture research experiences (project title, institution, mentor, period, hours/week, description) via list management TUI; skippable per entry and as a whole section | P2 | REQ-0001 | - |
 
 > ⚠️ Revised 2026-05-25: C02-F01 and C02-F02 revised — `enquirer` replaced with `ink` + `@inkjs/ui` for full-screen, large-font TUI. All menu logic and data flows are preserved; only the rendering layer changes. Decision ref: D-PRODUCT-AO000001, D-TECH-AO000008, D-TECH-AO000009.
+
+> ⚠️ Revised 2026-05-26: C02-F02 revised — adds generic-merge defaulting on resume so older `profile.json` files without `shadowing`/`research` fields no longer crash when those sections are opened. C02-F06 and C02-F07 revised — the entry-point list editors must tolerate a freshly-defaulted empty array and the corresponding missing `fieldStatus` keys without error. Visual treatment of the active menu row changes to bold white-on-black inverted highlight, and `dimColor` is removed from hint, footer, and inactive rows (shared `tui.tsx`). Decision ref: D-PRODUCT-AO000002, D-PRODUCT-AO000003.
 
 ---
 

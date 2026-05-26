@@ -54,6 +54,8 @@ license: Apache-2.0 (see LICENSE in project root)
 | Status | ID | Decision | Rationale | Alternatives Rejected | Impact | Owner | Notes |
 | :----: | :- | :------- | :-------- | :-------------------- | :----- | :---- | :---- |
 | `[X]` | D-PRODUCT-AO000001 | Use `ink` (React-based TUI) for C02 Student Profile full-screen menu UX | ESM-native, actively maintained, de facto standard for rich Node.js CLI UIs; delivers full-screen layout with large headers and visual breathing room | `blessed` (CJS-only, unmaintained since 2019), ANSI escapes only (insufficient visual richness) | `enquirer` replaced by `@inkjs/ui` in C02 only; all other components unaffected; adds `ink`, `react`, `@inkjs/ui` to production dependencies | DevAgent | Approved 2026-05-25 — Detailed Design phase, C02 UX defect fix |
+| `[X]` | D-PRODUCT-AO000002 | Drop `dimColor` from hint, footer, and inactive menu rows in shared `tui.tsx`; render the active menu row as bold white-on-black inverted highlight | Dim variant was too low-contrast and hurt readability; inverted highlight gives an unambiguous "selected" affordance without relying on color alone | Keeping dimColor (rejected — readability), magenta or cyan highlight bg (rejected — too loud, DevAgent prefers neutral) | Visual change affects both C02 (C02-F01..F07) and C05 (C05-F01..F05) since they share `tui.tsx`; no code structure change | DevAgent | Approved 2026-05-26 — Detailed Design phase, C02 bug fix |
+| `[X]` | D-PRODUCT-AO000003 | On resume, merge parsed `profile.json` over a fresh `emptyProfile()` shape (generic defaulting) rather than only patching `shadowing`/`research` | Schema growth is ongoing (F06/F07 just added; more likely); generic merge auto-heals any future-added field without per-release migration code | Per-field migration (rejected — fragile, needs new code per schema change), strict schema rejection (rejected — would break existing user profiles) | C02 only; load path in `buildStudentProfile` gains a one-line merge; no on-disk schema change | DevAgent | Approved 2026-05-26 — Detailed Design phase, C02 bug fix |
 
 ## Data & Storage
 
@@ -90,3 +92,4 @@ license: Apache-2.0 (see LICENSE in project root)
 | :- | :---------- | :--: | :----- |
 | CHG-001 | Initial decisions logged during Planning | 2026-05-24 | SpecGantry |
 | CHG-002 | D-PRODUCT-AO000001, D-TECH-AO000008–010 added for C02 UX defect fix (ink-based full-screen menus) | 2026-05-25 | SpecGantry |
+| CHG-003 | D-PRODUCT-AO000002, D-PRODUCT-AO000003 added for C02 bug fix (resume crash on F06/F07; tui.tsx visual contrast) | 2026-05-26 | SpecGantry |

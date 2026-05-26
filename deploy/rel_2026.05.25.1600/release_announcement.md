@@ -1,8 +1,8 @@
-# Release Announcement — admission-officer v1.0.2
+# Release Announcement — university-admission-officer v1.0.2
 
 **Date:** 2026-05-25
 **Type:** Patch release
-**Audience:** Users and operators of `admission-officer`
+**Audience:** Users and operators of `university-admission-officer`
 
 ---
 
@@ -37,7 +37,7 @@ This release sharpens the AI guidance quality across all four prompts. The tool 
 Users on v1.0.1 can upgrade with:
 
 ```
-npm install -g admission-officer@1.0.2
+npm install -g university-admission-officer@1.0.2
 ```
 
 Existing student and university profile data files are fully compatible.

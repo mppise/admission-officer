@@ -1,4 +1,4 @@
-# Release Announcement — admission-officer v1.2.0
+# Release Announcement — university-admission-officer v1.2.0
 
 **Release:** rel_2026.05.25.2149
 **Date:** 2026-05-25
@@ -40,7 +40,7 @@ The same full-screen TUI treatment now applies to every interactive prompt in th
 **Users:** No action required. Update with:
 
 ```
-npm install -g admission-officer
+npm install -g university-admission-officer
 ```
 
 **Operators:** No configuration changes. No data migration. `go.sh` is version-agnostic and requires no update.

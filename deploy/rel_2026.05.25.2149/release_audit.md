@@ -1,8 +1,8 @@
-# Release Audit — admission-officer v1.2.0
+# Release Audit — university-admission-officer v1.2.0
 
 **Verdict: ✅ PASS**
 **Release:** rel_2026.05.25.2149
-**Package:** admission-officer@1.2.0
+**Package:** university-admission-officer@1.2.0
 **Auditor:** SpecGantry
 **Date:** 2026-05-25
 **Type:** Patch release — full-screen ink TUI for C02 + C05; shared tui.tsx utility
@@ -95,7 +95,7 @@
 | Item | Detail |
 | :--- | :----- |
 | Trigger | Any SEV-1/SEV-2 issue discovered post-publish (crash, data loss, broken install) |
-| Mechanism | `npm publish` with prior tag: `npm dist-tag add admission-officer@1.1.0 latest` (requires npm publish rights) |
+| Mechanism | `npm publish` with prior tag: `npm dist-tag add university-admission-officer@1.1.0 latest` (requires npm publish rights) |
 | Database reversibility | N/A — local file-based storage. No migrations. `profile.json` format unchanged. |
 | Estimated recovery time | < 5 minutes for npm tag rollback; existing user data unaffected |
 

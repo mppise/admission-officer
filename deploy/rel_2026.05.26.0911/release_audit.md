@@ -1,8 +1,8 @@
-# Release Audit — admission-officer v1.3.0
+# Release Audit — university-admission-officer v1.3.0
 
 **Verdict: ✅ PASS**
 **Release:** rel_2026.05.26.0911
-**Package:** admission-officer@1.3.0
+**Package:** university-admission-officer@1.3.0
 **Auditor:** SpecGantry
 **Date:** 2026-05-26
 **Type:** Minor release — Shadowing & Research profile sections (C02-F06, C02-F07); full TUI visual overhaul; contextual guidance copy throughout
@@ -92,7 +92,7 @@
 | Item | Detail |
 | :--- | :----- |
 | Trigger | Any SEV-1/SEV-2 issue discovered post-publish (crash, data loss, broken install) |
-| Mechanism | `npm dist-tag add admission-officer@1.2.0 latest` |
+| Mechanism | `npm dist-tag add university-admission-officer@1.2.0 latest` |
 | Schema reversibility | `profile.json` files created under v1.3.0 will have `shadowing` and `research` keys — v1.2.0 `ProfileData` type does not include them. They will be silently ignored on load (TypeScript structural typing). No data loss. |
 | Estimated recovery time | < 5 minutes for npm tag rollback |
 

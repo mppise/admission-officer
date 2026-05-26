@@ -1,4 +1,4 @@
-# Release Announcement — admission-officer v1.1.0
+# Release Announcement — university-admission-officer v1.1.0
 
 **Date:** 2026-05-25
 **Type:** Minor release

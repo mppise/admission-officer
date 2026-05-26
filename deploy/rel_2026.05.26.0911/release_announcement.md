@@ -1,4 +1,4 @@
-# Release Announcement — admission-officer v1.3.0
+# Release Announcement — university-admission-officer v1.3.0
 
 **Date:** 2026-05-26
 **Type:** Minor release
@@ -42,7 +42,7 @@ The interface has been redesigned throughout:
 
 **Existing users:** No action required. Existing `profile.json` files load normally — the new `shadowing` and `research` sections will appear as `🔲 not started` until you fill them in. You can finalize your profile without completing them (both sections are skippable).
 
-**New installs:** `npm install -g admission-officer` (or follow your local install path).
+**New installs:** `npm install -g university-admission-officer` (or follow your local install path).
 
 ---
 
@@ -59,7 +59,7 @@ The interface has been redesigned throughout:
 If issues arise, rollback to v1.2.0:
 
 ```
-npm dist-tag add admission-officer@1.2.0 latest
+npm dist-tag add university-admission-officer@1.2.0 latest
 ```
 
 Existing `profile.json` data is fully compatible with v1.2.0 — the new `shadowing` and `research` keys will be silently ignored.

@@ -1,14 +1,14 @@
-# Release Announcement — admission-officer v1.0.0
+# Release Announcement — university-admission-officer v1.0.0
 
 **Date:** 2026-05-25
-**Package:** `admission-officer` on npm
-**Install:** `npm install -g admission-officer`
+**Package:** `university-admission-officer` on npm
+**Install:** `npm install -g university-admission-officer`
 
 ---
 
 ## What is this?
 
-`admission-officer` (`ao`) is a CLI tool that gives high school students personalised, AI-powered college admissions guidance — running entirely on their own machine.
+`university-admission-officer` (`ao`) is a CLI tool that gives high school students personalised, AI-powered college admissions guidance — running entirely on their own machine.
 
 ---
 

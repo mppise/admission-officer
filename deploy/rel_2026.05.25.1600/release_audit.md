@@ -1,8 +1,8 @@
-# Release Audit — admission-officer v1.0.2
+# Release Audit — university-admission-officer v1.0.2
 
 **Verdict: ✅ PASS**
 **Release:** 2026.05.25.1600
-**Package:** admission-officer@1.0.2
+**Package:** university-admission-officer@1.0.2
 **Auditor:** SpecGantry
 **Date:** 2026-05-25
 **Type:** Patch release (AI prompt persona overhaul — no TypeScript changes)
@@ -85,7 +85,7 @@ v1.0.1 shipped with AI prompts that used generic advisory personas ("expert coll
 
 | # | Flow | Command | Expected outcome |
 | :- | :--- | :------ | :--------------- |
-| 1 | Install globally | `npm install -g admission-officer@1.0.2` | Postinstall completes both Chromium downloads; no errors |
+| 1 | Install globally | `npm install -g university-admission-officer@1.0.2` | Postinstall completes both Chromium downloads; no errors |
 | 2 | Help workflow | `ao --help` | Workflow guidance shown |
 | 3 | Student profile | `ao --student-profile --build` | Wizard runs; `data/<name>/profile.md` written |
 | 4 | University profile | `ao --university-profile --build --domain brown.edu --student <name>` | BFS crawl + extraction; profile.md created; university profile reflects AO-lens language in `idealCandidateTraits` and `campusEthos` |
@@ -97,7 +97,7 @@ v1.0.1 shipped with AI prompts that used generic advisory personas ("expert coll
 | Concern | Detail |
 | :------ | :----- |
 | Trigger | User-reported regression in guidance/essay output quality or structural format breakage |
-| Mechanism | `npm deprecate admission-officer@1.0.2 "..."`, then restore prior prompt text and publish `1.0.3` |
+| Mechanism | `npm deprecate university-admission-officer@1.0.2 "..."`, then restore prior prompt text and publish `1.0.3` |
 | Data reversibility | N/A — all data is local to the user's machine; no server state |
 | Estimated recovery time | < 30 minutes to restore prompts, bump version, and publish |
 

@@ -1,8 +1,8 @@
-# Release Audit — admission-officer v1.0.1
+# Release Audit — university-admission-officer v1.0.1
 
 **Verdict: ✅ PASS**
 **Release:** 2026.05.25.1130
-**Package:** admission-officer@1.0.1
+**Package:** university-admission-officer@1.0.1
 **Auditor:** SpecGantry
 **Date:** 2026-05-25
 **Type:** Patch release (manifest-only fix)
@@ -12,7 +12,7 @@
 
 ## Reason for v1.0.1
 
-`v1.0.0` was published to npm but shipped a broken dependency manifest: `puppeteer` was imported by `src/components/c06-pdf-exporter/index.ts` but missing from `package.json` dependencies. Users running `npm install -g admission-officer@1.0.0` hit a `postinstall` build failure (TS2307 on `puppeteer` import resolution path), making the package effectively non-functional for PDF export.
+`v1.0.0` was published to npm but shipped a broken dependency manifest: `puppeteer` was imported by `src/components/c06-pdf-exporter/index.ts` but missing from `package.json` dependencies. Users running `npm install -g university-admission-officer@1.0.0` hit a `postinstall` build failure (TS2307 on `puppeteer` import resolution path), making the package effectively non-functional for PDF export.
 
 `v1.0.1` corrects the manifest only — **no `./src/` or `./SPECS/` changes**.
 
@@ -80,7 +80,7 @@
 
 | # | Flow | Command | Expected outcome |
 | :- | :--- | :------ | :--------------- |
-| 1 | Install globally | `npm install -g admission-officer@1.0.1` | Postinstall completes both Chromium downloads; no TS errors |
+| 1 | Install globally | `npm install -g university-admission-officer@1.0.1` | Postinstall completes both Chromium downloads; no TS errors |
 | 2 | Help workflow | `ao --help` | Workflow guidance shown |
 | 3 | Student profile | `ao --student-profile --build` | Wizard runs; `data/<name>/profile.md` written |
 | 4 | University profile | `ao --university-profile --build --domain brown.edu --student <name>` | BFS crawl + extraction; profile.md created |
@@ -91,7 +91,7 @@
 | Concern | Detail |
 | :------ | :----- |
 | Trigger | User-reported install failure or PDF export regression |
-| Mechanism | `npm deprecate admission-officer@1.0.1 "..."`, then publish patched `1.0.2` |
+| Mechanism | `npm deprecate university-admission-officer@1.0.1 "..."`, then publish patched `1.0.2` |
 | Data reversibility | N/A — all data is local to the user's machine; no server state |
 | Estimated recovery time | < 30 minutes to patch, rebuild, and publish |
 

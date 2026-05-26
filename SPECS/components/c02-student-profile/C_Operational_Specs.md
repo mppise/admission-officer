@@ -74,14 +74,23 @@ function waitForInput(prompt: string, initial: string, title: string): Promise<s
 
 `height={process.stdout.rows}` pins the outer box to the full terminal height, ensuring the layout fills the screen on all terminal sizes.
 
+> ⚠️ Revised 2026-05-26: Visual contract for the shared `src/utils/tui.tsx`:
+> - The active menu row renders as **bold white text on a black background** (inverted highlight), preceded by the `▌` cursor bar.
+> - Inactive menu rows render in **default white text without `dimColor`**.
+> - The hint callout (`╌ {hint}`) and the footer key legend render in their accent colors **without `dimColor`**.
+> - `dimColor` remains permissible only for non-text decorations such as the menu separator rule.
+> The snippet above is illustrative of layout, not of color treatment — the actual `dimColor` calls in the live `tui.tsx` are removed per this revision. Decision ref: D-PRODUCT-AO000002.
+
 ### C02-F01 / F02 — Menu Navigation Flow
 
 ```
 Entry:
 1. If name not provided: render full-screen TextInput → "Your full legal name:"
 2. Resolve slug → check for profile.json
-   - Found: load ProfileData + fieldStatus → resume menu (F02)
+   - Found: parse JSON, then **merge over a freshly-built `emptyProfile(name)` shape** so any field absent from the saved file (arrays, scalars, nested objects, `fieldStatus` keys) takes its empty default. This guarantees forward-compatibility for older saves that pre-date later schema additions such as `shadowing` / `research`. After merge → resume menu (F02).
    - Not found: initialize ProfileData with all fields empty, all fieldStatus = pending (F01)
+
+> ⚠️ Revised 2026-05-26: generic-merge defaulting added on resume to prevent runtime crashes when older `profile.json` files lack fields introduced by later releases (e.g., F06 `shadowing`, F07 `research`). Decision ref: D-PRODUCT-AO000003.
 3. Render Main Menu screen (Level 1)
 
 Main Menu loop:

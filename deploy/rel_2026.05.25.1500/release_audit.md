@@ -1,8 +1,8 @@
-# Release Audit — admission-officer v1.0.0
+# Release Audit — university-admission-officer v1.0.0
 
 **Verdict: ✅ PASS**
 **Release:** 2026.05.25.1500
-**Package:** admission-officer@1.0.0
+**Package:** university-admission-officer@1.0.0
 **Auditor:** SpecGantry
 **Date:** 2026-05-25
 
@@ -69,7 +69,7 @@
 
 | # | Flow | Command | Expected outcome |
 | :- | :--- | :------ | :--------------- |
-| 1 | Install globally | `npm install -g admission-officer` | `ao --help` displays step-by-step workflow |
+| 1 | Install globally | `npm install -g university-admission-officer` | `ao --help` displays step-by-step workflow |
 | 2 | Student profile | `ao --student-profile --build` | Wizard runs; `data/<name>/profile.md` created |
 | 3 | University profile | `ao --university-profile --build --domain brown.edu --student <name>` | Crawl starts; run stats printed; `data/<name>/brown/profile.md` created |
 | 4 | Guidance report | `ao --guidance --build --student <name> --university brown` | `data/<name>/brown/guidance.md` created |
@@ -80,7 +80,7 @@
 | Concern | Detail |
 | :------ | :------ |
 | Trigger | Any SEV-1/SEV-2 issue found post-publish, or user-reported install failure |
-| Mechanism | `npm deprecate admission-officer@1.0.0 "Critical issue — do not use"` followed by `npm publish` of a patched `1.0.1` |
+| Mechanism | `npm deprecate university-admission-officer@1.0.0 "Critical issue — do not use"` followed by `npm publish` of a patched `1.0.1` |
 | Data reversibility | Not applicable — all data is local to the user's machine; no server state to reverse |
 | Estimated recovery time | < 30 minutes to patch, rebuild, and publish a fix version |
 

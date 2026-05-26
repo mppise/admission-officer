@@ -1,8 +1,8 @@
-# Release Audit — admission-officer v1.0.0 (Re-Audit)
+# Release Audit — university-admission-officer v1.0.0 (Re-Audit)
 
 **Verdict: ✅ PASS**
 **Release:** 2026.05.25.1123
-**Package:** admission-officer@1.0.0
+**Package:** university-admission-officer@1.0.0
 **Auditor:** SpecGantry
 **Date:** 2026-05-25
 **Supersedes:** `rel_2026.05.25.1500/release_audit.md` (contained an inaccurate claim about `puppeteer` removal — corrected here)
@@ -86,7 +86,7 @@ Re-verified: `npm run build` is clean; `npm audit` reports 0 vulnerabilities (11
 
 | # | Flow | Command | Expected outcome |
 | :- | :--- | :------ | :--------------- |
-| 1 | Install globally | `npm install -g admission-officer` | Postinstall completes both Chromium downloads; `ao --help` shows workflow |
+| 1 | Install globally | `npm install -g university-admission-officer` | Postinstall completes both Chromium downloads; `ao --help` shows workflow |
 | 2 | Student profile | `ao --student-profile --build` | Wizard runs; `data/<name>/profile.md` written |
 | 3 | University profile | `ao --university-profile --build --domain brown.edu --student <name>` | BFS crawl + extraction; run stats printed; profile.md created |
 | 4 | Guidance report | `ao --guidance --build --student <name> --university brown` | `guidance.md` created |
@@ -98,7 +98,7 @@ Re-verified: `npm run build` is clean; `npm audit` reports 0 vulnerabilities (11
 | Concern | Detail |
 | :------ | :------ |
 | Trigger | Any SEV-1/SEV-2 found post-publish, or user-reported install failure |
-| Mechanism | `npm deprecate admission-officer@1.0.0 "Critical issue — do not use"`, then publish patched `1.0.1` |
+| Mechanism | `npm deprecate university-admission-officer@1.0.0 "Critical issue — do not use"`, then publish patched `1.0.1` |
 | Data reversibility | N/A — all data is local to the user's machine; no server state |
 | Estimated recovery time | < 30 minutes to patch, rebuild, and publish |
 

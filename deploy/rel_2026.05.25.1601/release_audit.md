@@ -1,8 +1,8 @@
-# Release Audit — admission-officer v1.1.0
+# Release Audit — university-admission-officer v1.1.0
 
 **Verdict: ✅ PASS**
 **Release:** rel_2026.05.25.1601
-**Package:** admission-officer@1.1.0
+**Package:** university-admission-officer@1.1.0
 **Auditor:** SpecGantry
 **Date:** 2026-05-25
 **Type:** Minor release — C02 Student Profile full redesign
@@ -94,6 +94,6 @@
 | Item | Detail |
 | :--- | :----- |
 | Trigger | `profile.md` not generated, crash on Finalize, or Gemini enhancement corrupting output |
-| Rollback mechanism | `npm install -g admission-officer@1.0.2` reinstates prior version |
+| Rollback mechanism | `npm install -g university-admission-officer@1.0.2` reinstates prior version |
 | Data reversibility | `profile.json` is never modified by the enhancement step — raw user data is always safe. Re-running Finalize on v1.0.2 would regenerate `profile.md` from the existing `profile.md` (old parse path). Existing `profile.json` files from v1.1.0 are forward-only; v1.0.2 does not read them. |
 | Estimated recovery time | < 5 minutes (npm reinstall + `npm link`) |

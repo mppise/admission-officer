@@ -10,7 +10,9 @@ Collects an essay prompt from the student interactively, reads the student and u
 
 | Status | ID | Description | Priority | Req Ref | Doc Level |
 | :----- | :- | :---------- | :------- | :------ | :-------- |
-| `Complete` | C05-F01 | Collect essay prompt and essay type from the student interactively via Enquirer | P1 | REQ-0009, REQ-0010 | - |
+| `Revised` | C05-F01 | Collect essay prompt and essay type from the student interactively via the shared `tui.tsx` ink helpers | P1 | REQ-0009, REQ-0010 | - |
+
+> ⚠️ Revised 2026-05-26: C05-F01 inherits the visual revision in shared `src/utils/tui.tsx` — the active menu row renders as bold white-on-black inverted highlight, and `dimColor` is removed from hint, footer, and inactive rows. No structural or prompt-flow change. Decision ref: D-PRODUCT-AO000002.
 | `Complete` | C05-F02 | Load and validate student profile and university profile from filesystem | P1 | REQ-0009 | - |
 | `Complete` | C05-F03 | Call Gemini with both profiles and the essay prompt to generate a structured outline plus inspiration samples | P1 | REQ-0009, REQ-0010 | - |
 | `Complete` | C05-F04 | Store the essay outline as markdown at the canonical path, with prominent disclaimer | P1 | REQ-0009, REQ-0013 | - |

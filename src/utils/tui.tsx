@@ -60,8 +60,8 @@ export function AppScreen({ subtitle, contextLine, hint, children, footerHint }:
       {/* GUIDANCE HINT — callout box */}
       {hint !== undefined && hint !== '' && (
         <Box paddingX={5} paddingTop={1} paddingBottom={0}>
-          <Text color="yellow" dimColor>  ╌ </Text>
-          <Text color="yellow" dimColor>{hint}</Text>
+          <Text color="yellow">  ╌ </Text>
+          <Text color="yellow">{hint}</Text>
         </Box>
       )}
 
@@ -72,12 +72,12 @@ export function AppScreen({ subtitle, contextLine, hint, children, footerHint }:
 
       {/* FOOTER */}
       <Box paddingX={5} paddingBottom={1}>
-        <Text dimColor color="magenta">  [ ↑↓ ] </Text>
-        <Text dimColor> navigate  </Text>
-        <Text dimColor color="magenta">[ ↵ ] </Text>
-        <Text dimColor> {footerHint ?? 'select'}  </Text>
-        <Text dimColor color="magenta">[ esc ] </Text>
-        <Text dimColor> back</Text>
+        <Text color="magenta">  [ ↑↓ ] </Text>
+        <Text color="white"> navigate  </Text>
+        <Text color="magenta">[ ↵ ] </Text>
+        <Text color="white"> {footerHint ?? 'select'}  </Text>
+        <Text color="magenta">[ esc ] </Text>
+        <Text color="white"> back</Text>
       </Box>
 
     </Box>
@@ -120,11 +120,11 @@ export function SpaciousSelect({ items, onSelect }: { items: SelectItem[]; onSel
               ? (
                 <Text>
                   <Text bold color="magenta">▌ </Text>
-                  <Text bold color="magenta">{item.label}</Text>
+                  <Text bold color="white" backgroundColor="black"> {item.label} </Text>
                 </Text>
               )
               : (
-                <Text color="white" dimColor>{'  '}{item.label}</Text>
+                <Text color="white">{'  '}{item.label}</Text>
               )
             }
           </Box>
