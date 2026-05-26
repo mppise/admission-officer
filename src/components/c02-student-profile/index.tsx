@@ -4,7 +4,7 @@ import { dataPath, writeFile, readFile, fileExists } from '../../utils/fileUtils
 import { toSlug } from '../../utils/slugUtils.js';
 import { loadPrompt } from '../../ai/promptLoader.js';
 import { getGeminiApiKey, getGeminiModel } from '../../config/env.js';
-import { waitForSelect, waitForText, type SelectItem } from '../../utils/tui.js';
+import { waitForSelect, waitForText, dotLeader, type SelectItem } from '../../utils/tui.js';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -30,6 +30,23 @@ interface Award {
   description: string;
 }
 
+interface ShadowingEntry {
+  organization: string;
+  field: string;
+  hoursTotal: string;
+  period: string;
+  description: string;
+}
+
+interface ResearchEntry {
+  projectTitle: string;
+  institution: string;
+  mentorName: string;
+  period: string;
+  hoursPerWeek: string;
+  description: string;
+}
+
 interface ProfileData {
   name: string;
   gradYear: string;
@@ -45,6 +62,8 @@ interface ProfileData {
   ibScores: Array<{ subject: string; score: string }>;
   extracurriculars: Extracurricular[];
   awards: Award[];
+  shadowing: ShadowingEntry[];
+  research: ResearchEntry[];
   generatedDate: string;
   lastUpdated: string;
   fieldStatus: Record<string, FieldStatus>;
@@ -82,6 +101,8 @@ function emptyProfile(name: string): ProfileData {
     ibScores: [],
     extracurriculars: [],
     awards: [],
+    shadowing: [],
+    research: [],
     generatedDate: now,
     lastUpdated: now,
     fieldStatus: {
@@ -101,6 +122,8 @@ function emptyProfile(name: string): ProfileData {
       ibScores: 'pending',
       extracurriculars: 'pending',
       awards: 'pending',
+      shadowing: 'pending',
+      research: 'pending',
     },
   };
 }
@@ -113,15 +136,17 @@ const SECTION_FIELDS: Record<string, string[]> = {
   'Standardized Tests':    ['satTotal', 'satMath', 'satReading', 'actComposite', 'apScores', 'ibScores'],
   Extracurriculars:        ['extracurriculars'],
   'Awards & Recognitions': ['awards'],
+  'Shadowing Experiences': ['shadowing'],
+  'Research Experiences':  ['research'],
 };
 
 function sectionIndicator(section: string, fs: Record<string, FieldStatus>): string {
   const fields = SECTION_FIELDS[section];
   const statuses = fields.map(f => fs[f]);
-  if (statuses.every(s => s === 'set' || s === 'skipped')) return '✓ complete';
-  if (statuses.every(s => s === 'pending')) return '○ not started';
+  if (statuses.every(s => s === 'set' || s === 'skipped')) return '✅ done';
+  if (statuses.every(s => s === 'pending')) return '🔲 not started';
   const pending = statuses.filter(s => s === 'pending').length;
-  return `● ${pending} field${pending > 1 ? 's' : ''} pending`;
+  return `⏳ ${pending} left`;
 }
 
 function allComplete(fs: Record<string, FieldStatus>): boolean {
@@ -130,25 +155,27 @@ function allComplete(fs: Record<string, FieldStatus>): boolean {
 
 function fieldLabel(key: string, data: ProfileData): string {
   const s = data.fieldStatus[key];
-  if (s === 'skipped') return '–  skipped';
-  if (s === 'pending') return '○';
+  if (s === 'skipped') return '⏭  skipped';
+  if (s === 'pending') return '🔲';
   switch (key) {
-    case 'gradYear':          return `✓  ${data.gradYear}`;
-    case 'highSchool':        return `✓  ${data.highSchool}`;
-    case 'intendedMajors':    return `✓  ${data.intendedMajors.join(', ')}`;
-    case 'gpaWeighted':       return `✓  ${data.gpaWeighted}`;
-    case 'gpaUnweighted':     return `✓  ${data.gpaUnweighted}`;
-    case 'classRank':         return `✓  ${data.classRank}`;
-    case 'transcript':        return `●  ${data.transcript.length} year${data.transcript.length !== 1 ? 's' : ''}`;
-    case 'satTotal':          return `✓  ${data.sat.total}`;
-    case 'satMath':           return `✓  ${data.sat.math}`;
-    case 'satReading':        return `✓  ${data.sat.reading}`;
-    case 'actComposite':      return `✓  ${data.act.composite}`;
-    case 'apScores':          return `●  ${data.apScores.length} subject${data.apScores.length !== 1 ? 's' : ''}`;
-    case 'ibScores':          return `●  ${data.ibScores.length} subject${data.ibScores.length !== 1 ? 's' : ''}`;
-    case 'extracurriculars':  return `●  ${data.extracurriculars.length} activit${data.extracurriculars.length !== 1 ? 'ies' : 'y'}`;
-    case 'awards':            return `●  ${data.awards.length} award${data.awards.length !== 1 ? 's' : ''}`;
-    default: return '✓';
+    case 'gradYear':          return `✅  ${data.gradYear}`;
+    case 'highSchool':        return `✅  ${data.highSchool}`;
+    case 'intendedMajors':    return `✅  ${data.intendedMajors.join(', ')}`;
+    case 'gpaWeighted':       return `✅  ${data.gpaWeighted}`;
+    case 'gpaUnweighted':     return `✅  ${data.gpaUnweighted}`;
+    case 'classRank':         return `✅  ${data.classRank}`;
+    case 'transcript':        return `📋  ${data.transcript.length} year${data.transcript.length !== 1 ? 's' : ''}`;
+    case 'satTotal':          return `✅  ${data.sat.total}`;
+    case 'satMath':           return `✅  ${data.sat.math}`;
+    case 'satReading':        return `✅  ${data.sat.reading}`;
+    case 'actComposite':      return `✅  ${data.act.composite}`;
+    case 'apScores':          return `📋  ${data.apScores.length} subject${data.apScores.length !== 1 ? 's' : ''}`;
+    case 'ibScores':          return `📋  ${data.ibScores.length} subject${data.ibScores.length !== 1 ? 's' : ''}`;
+    case 'extracurriculars':  return `📋  ${data.extracurriculars.length} activit${data.extracurriculars.length !== 1 ? 'ies' : 'y'}`;
+    case 'awards':            return `📋  ${data.awards.length} award${data.awards.length !== 1 ? 's' : ''}`;
+    case 'shadowing':         return `📋  ${data.shadowing.length} entr${data.shadowing.length !== 1 ? 'ies' : 'y'}`;
+    case 'research':          return `📋  ${data.research.length} entr${data.research.length !== 1 ? 'ies' : 'y'}`;
+    default: return '✅';
   }
 }
 
@@ -221,8 +248,8 @@ async function editIntendedMajors(slug: string, data: ProfileData): Promise<void
       ...data.intendedMajors.map((m, i) => ({ label: `${i + 1}. ${m}`, value: `entry:${i}` })),
       { label: '', value: '__sep__', separator: true },
       { label: 'Add major / track', value: 'add' },
-      ...(data.intendedMajors.length > 0 ? [{ label: 'Remove a major / track', value: 'remove' }] : []),
-      { label: 'Back', value: 'back' },
+      ...(data.intendedMajors.length > 0 ? [{ label: '✗  Remove a major / track', value: 'remove' }] : []),
+      { label: '←  Back', value: 'back' },
     ];
     const choice = await waitForSelect(items, 'Personal › Intended Majors', data.name);
     if (choice === 'back' || choice === '__sep__') break;
@@ -236,7 +263,7 @@ async function editIntendedMajors(slug: string, data: ProfileData): Promise<void
       }
     } else if (choice === 'remove') {
       const removeItems = data.intendedMajors.map((m, i) => ({ label: m, value: String(i) }));
-      removeItems.push({ label: 'Back', value: 'back' });
+      removeItems.push({ label: '←  Back', value: 'back' });
       const idxStr = await waitForSelect(removeItems, 'Personal › Remove Major', data.name);
       if (idxStr !== 'back') {
         const idx = parseInt(idxStr);
@@ -248,7 +275,7 @@ async function editIntendedMajors(slug: string, data: ProfileData): Promise<void
       // existing entry selected — offer remove
       const idx = parseInt(choice.split(':')[1]);
       const action = await waitForSelect(
-        [{ label: 'Remove this entry', value: 'remove' }, { label: 'Back', value: 'back' }],
+        [{ label: '✗  Remove this entry', value: 'remove' }, { label: '←  Back', value: 'back' }],
         `Personal › Major: ${data.intendedMajors[idx]}`,
         data.name,
       );
@@ -269,10 +296,10 @@ async function editTranscript(slug: string, data: ProfileData): Promise<void> {
         value: `year:${i}`,
       })),
       { label: '', value: '__sep__', separator: true },
-      { label: 'Add year', value: 'add' },
-      ...(data.transcript.length > 0 ? [{ label: 'Remove a year', value: 'remove' }] : []),
-      { label: 'Skip transcript', value: 'skip' },
-      { label: 'Back', value: 'back' },
+      { label: '＋  Add year', value: 'add' },
+      ...(data.transcript.length > 0 ? [{ label: '✗  Remove a year', value: 'remove' }] : []),
+      { label: '⏭  Skip transcript', value: 'skip' },
+      { label: '←  Back', value: 'back' },
     ];
     const choice = await waitForSelect(items, 'Academics › Transcript', data.name);
     if (choice === 'back' || choice === '__sep__') break;
@@ -300,7 +327,7 @@ async function editTranscript(slug: string, data: ProfileData): Promise<void> {
       }
     } else if (choice === 'remove') {
       const removeItems = data.transcript.map((y, i) => ({ label: y.yearLabel, value: String(i) }));
-      removeItems.push({ label: 'Back', value: 'back' });
+      removeItems.push({ label: '←  Back', value: 'back' });
       const idxStr = await waitForSelect(removeItems, 'Academics › Remove Year', data.name);
       if (idxStr !== 'back') {
         data.transcript.splice(parseInt(idxStr), 1);
@@ -321,9 +348,9 @@ async function editCourses(slug: string, data: ProfileData, year: TranscriptYear
     const items: SelectItem[] = [
       ...year.courses.map((c, i) => ({ label: `${i + 1}. ${c.name} — ${c.grade}`, value: `course:${i}` })),
       { label: '', value: '__sep__', separator: true },
-      { label: 'Add course', value: 'add' },
-      ...(year.courses.length > 0 ? [{ label: 'Remove a course', value: 'remove' }] : []),
-      { label: 'Back', value: 'back' },
+      { label: '＋  Add course', value: 'add' },
+      ...(year.courses.length > 0 ? [{ label: '✗  Remove a course', value: 'remove' }] : []),
+      { label: '←  Back', value: 'back' },
     ];
     const choice = await waitForSelect(items, `Academics › ${year.yearLabel} › Courses`, data.name);
     if (choice === 'back' || choice === '__sep__') break;
@@ -336,7 +363,7 @@ async function editCourses(slug: string, data: ProfileData, year: TranscriptYear
       await saveJson(slug, data);
     } else if (choice === 'remove') {
       const removeItems = year.courses.map((c, i) => ({ label: `${c.name} — ${c.grade}`, value: String(i) }));
-      removeItems.push({ label: 'Back', value: 'back' });
+      removeItems.push({ label: '←  Back', value: 'back' });
       const idxStr = await waitForSelect(removeItems, `Academics › ${year.yearLabel} › Remove Course`, data.name);
       if (idxStr !== 'back') {
         year.courses.splice(parseInt(idxStr), 1);
@@ -368,10 +395,10 @@ async function editScorePairs(
     const items: SelectItem[] = [
       ...list.map((s, i) => ({ label: `${i + 1}. ${s.subject} — ${s.score}`, value: `entry:${i}` })),
       { label: '', value: '__sep__', separator: true },
-      { label: `Add ${label}`, value: 'add' },
-      ...(list.length > 0 ? [{ label: `Remove a ${label}`, value: 'remove' }] : []),
-      { label: `Skip ${label}`, value: 'skip' },
-      { label: 'Back', value: 'back' },
+      { label: `＋  Add ${label}`, value: 'add' },
+      ...(list.length > 0 ? [{ label: `✗  Remove a ${label}`, value: 'remove' }] : []),
+      { label: `⏭  Skip ${label}`, value: 'skip' },
+      { label: '←  Back', value: 'back' },
     ];
     const choice = await waitForSelect(items, subtitle, data.name);
     if (choice === 'back' || choice === '__sep__') break;
@@ -390,7 +417,7 @@ async function editScorePairs(
       await saveJson(slug, data);
     } else if (choice === 'remove') {
       const removeItems = list.map((s, i) => ({ label: `${s.subject} — ${s.score}`, value: String(i) }));
-      removeItems.push({ label: 'Back', value: 'back' });
+      removeItems.push({ label: '←  Back', value: 'back' });
       const idxStr = await waitForSelect(removeItems, `${subtitle} › Remove`, data.name);
       if (idxStr !== 'back') {
         list.splice(parseInt(idxStr), 1);
@@ -416,11 +443,11 @@ async function editExtracurriculars(slug: string, data: ProfileData): Promise<vo
     const items: SelectItem[] = [
       ...list.map((e, i) => ({ label: `${i + 1}. ${e.activityName} — ${e.role}`, value: `entry:${i}` })),
       { label: '', value: '__sep__', separator: true },
-      { label: 'Add activity', value: 'add' },
-      { label: 'Skip extracurriculars', value: 'skip' },
-      { label: 'Back', value: 'back' },
+      { label: '＋  Add activity', value: 'add' },
+      { label: '⏭  Skip extracurriculars', value: 'skip' },
+      { label: '←  Back', value: 'back' },
     ];
-    const choice = await waitForSelect(items, 'Extracurriculars', data.name);
+    const choice = await waitForSelect(items, 'Extracurriculars', data.name, undefined, HINTS.extracurriculars);
     if (choice === 'back' || choice === '__sep__') break;
 
     if (choice === 'skip') {
@@ -438,7 +465,7 @@ async function editExtracurriculars(slug: string, data: ProfileData): Promise<vo
       const existing = list[idx];
       if (!existing) continue;
       const action = await waitForSelect(
-        [{ label: 'Edit', value: 'edit' }, { label: 'Remove', value: 'remove' }, { label: 'Back', value: 'back' }],
+        [{ label: '✏️  Edit', value: 'edit' }, { label: '✗  Remove', value: 'remove' }, { label: '←  Back', value: 'back' }],
         `Extracurriculars › ${existing.activityName}`,
         data.name,
       );
@@ -455,11 +482,11 @@ async function editExtracurriculars(slug: string, data: ProfileData): Promise<vo
 }
 
 async function collectActivityEntry(studentName: string, existing?: Extracurricular): Promise<Extracurricular> {
-  const activityName = await waitForText('Activity name:', existing?.activityName ?? '', 'Extracurriculars › Activity Name', studentName);
-  const role = await waitForText('Your role:', existing?.role ?? '', 'Extracurriculars › Role', studentName);
+  const activityName = await waitForText('Activity name:', existing?.activityName ?? '', 'Extracurriculars › Activity Name', studentName, HINTS.activityName);
+  const role = await waitForText('Your role or position (e.g., Captain, Treasurer, Member):', existing?.role ?? '', 'Extracurriculars › Role', studentName);
   const yearsInvolved = await waitForText('Years involved (e.g., 2021–2024):', existing?.yearsInvolved ?? '', 'Extracurriculars › Years Involved', studentName);
-  const hoursPerWeek = await waitForText('Hours per week (approx):', existing?.hoursPerWeek ?? '', 'Extracurriculars › Hours/Week', studentName);
-  const description = await waitForText('One-sentence description of your impact:', existing?.description ?? '', 'Extracurriculars › Description', studentName);
+  const hoursPerWeek = await waitForText('Approximate hours per week:', existing?.hoursPerWeek ?? '', 'Extracurriculars › Hours/Week', studentName);
+  const description = await waitForText('Your specific impact in one sentence:', existing?.description ?? '', 'Extracurriculars › Description', studentName, HINTS.ecDescription);
   return {
     activityName: activityName.trim(),
     role: role.trim(),
@@ -475,11 +502,11 @@ async function editAwards(slug: string, data: ProfileData): Promise<void> {
     const items: SelectItem[] = [
       ...list.map((a, i) => ({ label: `${i + 1}. ${a.awardName} — ${a.level} (${a.year})`, value: `entry:${i}` })),
       { label: '', value: '__sep__', separator: true },
-      { label: 'Add award', value: 'add' },
-      { label: 'Skip awards', value: 'skip' },
-      { label: 'Back', value: 'back' },
+      { label: '＋  Add award', value: 'add' },
+      { label: '⏭  Skip awards', value: 'skip' },
+      { label: '←  Back', value: 'back' },
     ];
-    const choice = await waitForSelect(items, 'Awards & Recognitions', data.name);
+    const choice = await waitForSelect(items, 'Awards & Recognitions', data.name, undefined, HINTS.awards);
     if (choice === 'back' || choice === '__sep__') break;
 
     if (choice === 'skip') {
@@ -497,7 +524,7 @@ async function editAwards(slug: string, data: ProfileData): Promise<void> {
       const existing = list[idx];
       if (!existing) continue;
       const action = await waitForSelect(
-        [{ label: 'Edit', value: 'edit' }, { label: 'Remove', value: 'remove' }, { label: 'Back', value: 'back' }],
+        [{ label: '✏️  Edit', value: 'edit' }, { label: '✗  Remove', value: 'remove' }, { label: '←  Back', value: 'back' }],
         `Awards › ${existing.awardName}`,
         data.name,
       );
@@ -514,28 +541,197 @@ async function editAwards(slug: string, data: ProfileData): Promise<void> {
 }
 
 async function collectAwardEntry(studentName: string, existing?: Award): Promise<Award> {
-  const awardName = await waitForText('Award name:', existing?.awardName ?? '', 'Awards › Award Name', studentName);
+  const awardName = await waitForText('Award or recognition name:', existing?.awardName ?? '', 'Awards › Award Name', studentName);
   const level = await waitForSelect(
     ['Local', 'Regional', 'State', 'National', 'International'].map(l => ({ label: l, value: l })),
     'Awards › Level',
     studentName,
+    undefined,
+    'Select the broadest reach of this award.',
   );
   const year = await waitForText('Year received:', existing?.year ?? '', 'Awards › Year', studentName);
-  const description = await waitForText('One-sentence description:', existing?.description ?? '', 'Awards › Description', studentName);
+  const description = await waitForText('What was this award for? (one sentence):', existing?.description ?? '', 'Awards › Description', studentName, HINTS.awardDescription);
   return { awardName: awardName.trim(), level, year: year.trim(), description: description.trim() };
 }
 
-// ─── Section menus (Level 2) ──────────────────────────────────────────────────
+// [C02-F06] Shadowing experiences list editor
+async function editShadowing(slug: string, data: ProfileData): Promise<void> {
+  const list = data.shadowing;
+  while (true) {
+    const items: SelectItem[] = [
+      ...list.map((s, i) => ({ label: `${i + 1}. ${s.organization} — ${s.field}`, value: `entry:${i}` })),
+      { label: '', value: '__sep__', separator: true },
+      { label: '＋  Add shadowing experience', value: 'add' },
+      { label: '⏭  Skip shadowing experiences', value: 'skip' },
+      { label: '←  Back', value: 'back' },
+    ];
+    const choice = await waitForSelect(items, 'Shadowing Experiences', data.name, undefined, HINTS.shadowing);
+    if (choice === 'back' || choice === '__sep__') break;
+
+    if (choice === 'skip') {
+      data.fieldStatus['shadowing'] = 'skipped';
+      await saveJson(slug, data);
+      break;
+    }
+    if (choice === 'add') {
+      const entry = await collectShadowingEntry(data.name);
+      list.push(entry);
+      data.fieldStatus['shadowing'] = 'set';
+      await saveJson(slug, data);
+    } else if (choice.startsWith('entry:')) {
+      const idx = parseInt(choice.split(':')[1]);
+      const existing = list[idx];
+      if (!existing) continue;
+      const action = await waitForSelect(
+        [{ label: '✏️  Edit', value: 'edit' }, { label: '✗  Remove', value: 'remove' }, { label: '←  Back', value: 'back' }],
+        `Shadowing › ${existing.organization}`,
+        data.name,
+      );
+      if (action === 'edit') {
+        list[idx] = await collectShadowingEntry(data.name, existing);
+        await saveJson(slug, data);
+      } else if (action === 'remove') {
+        list.splice(idx, 1);
+        data.fieldStatus['shadowing'] = list.length > 0 ? 'set' : 'pending';
+        await saveJson(slug, data);
+      }
+    }
+  }
+}
+
+async function collectShadowingEntry(studentName: string, existing?: ShadowingEntry): Promise<ShadowingEntry> {
+  const organization = await waitForText('Where did you shadow? (hospital, firm, lab, etc.):', existing?.organization ?? '', 'Shadowing › Organization', studentName);
+  const field = await waitForText('Specialty or field (e.g., Cardiology, Environmental Law):', existing?.field ?? '', 'Shadowing › Field', studentName);
+
+  const hourChoice = await waitForSelect(
+    [{ label: 'Enter total hours', value: 'enter' }, { label: 'Skip total hours', value: 'skip' }],
+    'Shadowing › Total Hours',
+    studentName,
+    undefined,
+    'Total hours across all visits, not per week.',
+  );
+  const hoursTotal = hourChoice === 'enter'
+    ? (await waitForText('Total hours logged (e.g., 40):', existing?.hoursTotal ?? '', 'Shadowing › Total Hours', studentName)).trim()
+    : '';
+
+  const period = await waitForText('When did this take place? (e.g., Summer 2023):', existing?.period ?? '', 'Shadowing › Period', studentName);
+  const description = await waitForText('What did you observe or do? (one sentence):', existing?.description ?? '', 'Shadowing › Description', studentName, HINTS.shadowDescription);
+  return {
+    organization: organization.trim(),
+    field: field.trim(),
+    hoursTotal,
+    period: period.trim(),
+    description: description.trim(),
+  };
+}
+
+// [C02-F07] Research experiences list editor
+async function editResearch(slug: string, data: ProfileData): Promise<void> {
+  const list = data.research;
+  while (true) {
+    const items: SelectItem[] = [
+      ...list.map((r, i) => ({ label: `${i + 1}. ${r.projectTitle} — ${r.institution}`, value: `entry:${i}` })),
+      { label: '', value: '__sep__', separator: true },
+      { label: '＋  Add research experience', value: 'add' },
+      { label: '⏭  Skip research experiences', value: 'skip' },
+      { label: '←  Back', value: 'back' },
+    ];
+    const choice = await waitForSelect(items, 'Research Experiences', data.name, undefined, HINTS.research);
+    if (choice === 'back' || choice === '__sep__') break;
+
+    if (choice === 'skip') {
+      data.fieldStatus['research'] = 'skipped';
+      await saveJson(slug, data);
+      break;
+    }
+    if (choice === 'add') {
+      const entry = await collectResearchEntry(data.name);
+      list.push(entry);
+      data.fieldStatus['research'] = 'set';
+      await saveJson(slug, data);
+    } else if (choice.startsWith('entry:')) {
+      const idx = parseInt(choice.split(':')[1]);
+      const existing = list[idx];
+      if (!existing) continue;
+      const action = await waitForSelect(
+        [{ label: '✏️  Edit', value: 'edit' }, { label: '✗  Remove', value: 'remove' }, { label: '←  Back', value: 'back' }],
+        `Research › ${existing.projectTitle}`,
+        data.name,
+      );
+      if (action === 'edit') {
+        list[idx] = await collectResearchEntry(data.name, existing);
+        await saveJson(slug, data);
+      } else if (action === 'remove') {
+        list.splice(idx, 1);
+        data.fieldStatus['research'] = list.length > 0 ? 'set' : 'pending';
+        await saveJson(slug, data);
+      }
+    }
+  }
+}
+
+async function collectResearchEntry(studentName: string, existing?: ResearchEntry): Promise<ResearchEntry> {
+  const projectTitle = await waitForText('Project title or brief name:', existing?.projectTitle ?? '', 'Research › Project Title', studentName);
+  const institution = await waitForText('Institution, lab, or "Independent":', existing?.institution ?? '', 'Research › Institution', studentName);
+
+  const mentorChoice = await waitForSelect(
+    [{ label: 'Enter mentor name', value: 'enter' }, { label: 'Skip mentor name', value: 'skip' }],
+    'Research › Mentor',
+    studentName,
+    undefined,
+    'Skip if self-directed or if you prefer not to name them.',
+  );
+  const mentorName = mentorChoice === 'enter'
+    ? (await waitForText('Mentor or PI name:', existing?.mentorName ?? '', 'Research › Mentor Name', studentName)).trim()
+    : '';
+
+  const period = await waitForText('When did this take place? (e.g., June–August 2024):', existing?.period ?? '', 'Research › Period', studentName);
+
+  const hpwChoice = await waitForSelect(
+    [{ label: 'Enter hours per week', value: 'enter' }, { label: 'Skip hours per week', value: 'skip' }],
+    'Research › Hours/Week',
+    studentName,
+    undefined,
+    'Approximate average — skip if highly variable.',
+  );
+  const hoursPerWeek = hpwChoice === 'enter'
+    ? (await waitForText('Approximate hours per week:', existing?.hoursPerWeek ?? '', 'Research › Hours/Week', studentName)).trim()
+    : '';
+
+  const description = await waitForText('Your role and key contribution (one sentence):', existing?.description ?? '', 'Research › Description', studentName, HINTS.researchDescription);
+  return {
+    projectTitle: projectTitle.trim(),
+    institution: institution.trim(),
+    mentorName,
+    period: period.trim(),
+    hoursPerWeek,
+    description: description.trim(),
+  };
+}
+
+// ─── Section guidance hints ───────────────────────────────────────────────────
+
+const HINTS = {
+  extracurriculars: 'Clubs, sports, jobs, volunteering — recurring commitments outside class. Not competitions or one-off recognition (use Awards), shadowing, or research.',
+  awards:           'Competitions won, scholarships, honor societies, or formal recognition. Not everyday participation — use Extracurriculars for that.',
+  shadowing:        'Observing a professional at work — clinical, legal, research, or any field. You watched and learned; you did not lead a project (use Research for that).',
+  research:         'A project where you investigated a question, collected or analysed data, or built something with intellectual intent — with a mentor or independently.',
+  activityName:     'Use the official name, e.g. "Varsity Soccer" or "Model United Nations".',
+  ecDescription:    'Describe your specific contribution or impact, not just your title. What changed because you were there?',
+  awardDescription: 'What was the award for and why does it matter to you? Keep it factual.',
+  shadowDescription:'What did you observe or do? Include the specialty and what you took away from it.',
+  researchDescription: 'What was your specific role? What did you find, build, or contribute?',
+};
 
 async function sectionPersonal(slug: string, data: ProfileData): Promise<void> {
   while (true) {
     const items: SelectItem[] = [
-      { label: `Graduation Year          ${fieldLabel('gradYear', data)}`, value: 'gradYear' },
-      { label: `High School              ${fieldLabel('highSchool', data)}`, value: 'highSchool' },
-      { label: `Intended Majors / Tracks ${fieldLabel('intendedMajors', data)}`, value: 'intendedMajors' },
+      { label: dotLeader('Graduation Year',          fieldLabel('gradYear', data),        26), value: 'gradYear' },
+      { label: dotLeader('High School',              fieldLabel('highSchool', data),       26), value: 'highSchool' },
+      { label: dotLeader('Intended Majors / Tracks', fieldLabel('intendedMajors', data),   26), value: 'intendedMajors' },
       { label: '', value: '__sep__', separator: true },
-      { label: 'Skip entire section', value: 'skip' },
-      { label: 'Back', value: 'back' },
+      { label: '⏭   Skip entire section', value: 'skip' },
+      { label: '←   Back', value: 'back' },
     ];
     const choice = await waitForSelect(items, 'Personal', data.name);
     if (choice === 'back' || choice === '__sep__') break;
@@ -556,13 +752,13 @@ async function sectionPersonal(slug: string, data: ProfileData): Promise<void> {
 async function sectionAcademics(slug: string, data: ProfileData): Promise<void> {
   while (true) {
     const items: SelectItem[] = [
-      { label: `GPA (Weighted)   ${fieldLabel('gpaWeighted', data)}`, value: 'gpaWeighted' },
-      { label: `GPA (Unweighted) ${fieldLabel('gpaUnweighted', data)}`, value: 'gpaUnweighted' },
-      { label: `Class Rank       ${fieldLabel('classRank', data)}`, value: 'classRank' },
-      { label: `Transcript       ${fieldLabel('transcript', data)}`, value: 'transcript' },
+      { label: dotLeader('GPA (Weighted)',   fieldLabel('gpaWeighted', data),   26), value: 'gpaWeighted' },
+      { label: dotLeader('GPA (Unweighted)', fieldLabel('gpaUnweighted', data), 26), value: 'gpaUnweighted' },
+      { label: dotLeader('Class Rank',       fieldLabel('classRank', data),     26), value: 'classRank' },
+      { label: dotLeader('Transcript',       fieldLabel('transcript', data),    26), value: 'transcript' },
       { label: '', value: '__sep__', separator: true },
-      { label: 'Skip entire section', value: 'skip' },
-      { label: 'Back', value: 'back' },
+      { label: '⏭   Skip entire section', value: 'skip' },
+      { label: '←   Back', value: 'back' },
     ];
     const choice = await waitForSelect(items, 'Academics', data.name);
     if (choice === 'back' || choice === '__sep__') break;
@@ -584,15 +780,15 @@ async function sectionAcademics(slug: string, data: ProfileData): Promise<void> 
 async function sectionTests(slug: string, data: ProfileData): Promise<void> {
   while (true) {
     const items: SelectItem[] = [
-      { label: `SAT Total              ${fieldLabel('satTotal', data)}`, value: 'satTotal' },
-      { label: `SAT Math               ${fieldLabel('satMath', data)}`, value: 'satMath' },
-      { label: `SAT Reading/Writing    ${fieldLabel('satReading', data)}`, value: 'satReading' },
-      { label: `ACT Composite          ${fieldLabel('actComposite', data)}`, value: 'actComposite' },
-      { label: `AP Scores              ${fieldLabel('apScores', data)}`, value: 'apScores' },
-      { label: `IB Scores              ${fieldLabel('ibScores', data)}`, value: 'ibScores' },
+      { label: dotLeader('SAT Total',           fieldLabel('satTotal', data),      26), value: 'satTotal' },
+      { label: dotLeader('SAT Math',            fieldLabel('satMath', data),       26), value: 'satMath' },
+      { label: dotLeader('SAT Reading/Writing', fieldLabel('satReading', data),    26), value: 'satReading' },
+      { label: dotLeader('ACT Composite',       fieldLabel('actComposite', data),  26), value: 'actComposite' },
+      { label: dotLeader('AP Scores',           fieldLabel('apScores', data),      26), value: 'apScores' },
+      { label: dotLeader('IB Scores',           fieldLabel('ibScores', data),      26), value: 'ibScores' },
       { label: '', value: '__sep__', separator: true },
-      { label: 'Skip entire section', value: 'skip' },
-      { label: 'Back', value: 'back' },
+      { label: '⏭   Skip entire section', value: 'skip' },
+      { label: '←   Back', value: 'back' },
     ];
     const choice = await waitForSelect(items, 'Standardized Tests', data.name);
     if (choice === 'back' || choice === '__sep__') break;
@@ -745,6 +941,34 @@ function renderProfileMarkdown(data: ProfileData): string {
   lines.push('');
   lines.push('---');
   lines.push('');
+  lines.push('## Shadowing Experiences');
+  lines.push('');
+  if (data.shadowing.length === 0) {
+    lines.push('*No shadowing experiences added.*');
+  } else {
+    lines.push('| Organization | Field | Hours | Period | Description |');
+    lines.push('| :----------- | :---- | :---- | :----- | :---------- |');
+    for (const sh of data.shadowing) {
+      lines.push(`| ${sh.organization} | ${sh.field} | ${sh.hoursTotal || '—'} | ${sh.period} | ${sh.description} |`);
+    }
+  }
+  lines.push('');
+  lines.push('---');
+  lines.push('');
+  lines.push('## Research Experiences');
+  lines.push('');
+  if (data.research.length === 0) {
+    lines.push('*No research experiences added.*');
+  } else {
+    lines.push('| Project | Institution | Mentor | Period | Hrs/Week | Description |');
+    lines.push('| :------ | :---------- | :----- | :----- | :------- | :---------- |');
+    for (const re of data.research) {
+      lines.push(`| ${re.projectTitle} | ${re.institution} | ${re.mentorName || '—'} | ${re.period} | ${re.hoursPerWeek || '—'} | ${re.description} |`);
+    }
+  }
+  lines.push('');
+  lines.push('---');
+  lines.push('');
   return lines.join('\n');
 }
 
@@ -756,24 +980,24 @@ async function mainMenu(slug: string, data: ProfileData): Promise<void> {
 
   while (true) {
     const complete = allComplete(data.fieldStatus);
-    const pendingSections = sections.filter(s => sectionIndicator(s, data.fieldStatus) !== '✓ complete').length;
+    const pendingSections = sections.filter(s => sectionIndicator(s, data.fieldStatus) !== '✅ done').length;
     const completionPill = pendingSections === 0
-      ? '✓ all sections complete'
-      : `● ${pendingSections} section${pendingSections > 1 ? 's' : ''} pending`;
+      ? '✅ all sections complete'
+      : `⏳ ${pendingSections} section${pendingSections > 1 ? 's' : ''} left`;
 
     const items: SelectItem[] = [
       ...sections.map(s => ({
-        label: `${s.padEnd(30)} ${sectionIndicator(s, data.fieldStatus)}`,
+        label: dotLeader(s, sectionIndicator(s, data.fieldStatus), 30),
         value: s,
       })),
-      { label: '─────────────────────────────────────────', value: '__sep__' },
+      { label: '', value: '__sep__', separator: true },
       {
         label: complete
-          ? 'Finalize & Save'
-          : 'Finalize & Save  (complete all sections first)',
+          ? '🚀  Finalize & Save'
+          : '🔒  Finalize & Save  (complete all sections first)',
         value: 'finalize',
       },
-      { label: 'Quit without saving', value: 'quit' },
+      { label: '✗   Quit without saving', value: 'quit' },
     ];
 
     const choice = await waitForSelect(items, 'Student Profile', data.name, completionPill);
@@ -803,6 +1027,8 @@ async function mainMenu(slug: string, data: ProfileData): Promise<void> {
       case 'Standardized Tests':    await sectionTests(slug, data); break;
       case 'Extracurriculars':      await editExtracurriculars(slug, data); break;
       case 'Awards & Recognitions': await editAwards(slug, data); break;
+      case 'Shadowing Experiences': await editShadowing(slug, data); break;
+      case 'Research Experiences':  await editResearch(slug, data); break;
     }
   }
 }

@@ -213,6 +213,17 @@ Field Edit (Level 3 — list):
 | `awards[].level` | enum | Yes | Local/Regional/State/National/International | No | |
 | `awards[].year` | string | Yes | Non-empty | No | |
 | `awards[].description` | string | Yes | Non-empty | No | |
+| `shadowing[].organization` | string | No | Non-empty | No | Where the shadowing took place |
+| `shadowing[].field` | string | No | Non-empty | No | Discipline/department (e.g., "Cardiology") |
+| `shadowing[].hoursTotal` | string | Yes | Free text | No | Approximate total hours |
+| `shadowing[].period` | string | No | Non-empty | No | e.g., "Summer 2023" |
+| `shadowing[].description` | string | No | Non-empty | No | |
+| `research[].projectTitle` | string | No | Non-empty | No | |
+| `research[].institution` | string | No | Non-empty | No | Lab, university, org, or "Independent" |
+| `research[].mentorName` | string | Yes | Free text | No | PI or supervisor; skippable |
+| `research[].period` | string | No | Non-empty | No | e.g., "June–August 2024" |
+| `research[].hoursPerWeek` | string | Yes | Free text | No | Approximate |
+| `research[].description` | string | No | Non-empty | No | |
 
 **PII fields:** `name` only. Stored locally on student's own machine — no transmission.
 

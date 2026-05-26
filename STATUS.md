@@ -8,8 +8,8 @@ license: Apache-2.0 (see LICENSE in project root)
 # Project Status
 
 > **Overall health:** 🟢 On Track
-> **Last updated:** 2026-05-25
-> **Active phase:** Deployment Readiness — v1.2.0 audit PASS, ready to deploy
+> **Last updated:** 2026-05-26
+> **Active phase:** Deployment Readiness — v1.3.0 audit PASS, ready to deploy
 
 ---
 
@@ -21,7 +21,7 @@ license: Apache-2.0 (see LICENSE in project root)
 | Planning | ✅ | 2026-05-24 | 2026-05-24 | SpecGantry | B_Architecture.md finalized; 11 decisions approved; 5 risks accepted |
 | Detailed Design | ✅ | 2026-05-24 | 2026-05-24 | SpecGantry | All 6 components specified and ready |
 | Development | ✅ | 2026-05-24 | 2026-05-25 | SpecGantry | All 6 components implemented; tsc clean |
-| Deployment Readiness | ✅ | 2026-05-25 | 2026-05-25 | SpecGantry | v1.2.0 audit `rel_2026.05.25.2149` PASS — ink TUI migration (C02 + C05); 0 SEV-1/SEV-2; 5 SEV-3; go.sh unchanged (version-agnostic) |
+| Deployment Readiness | ✅ | 2026-05-25 | 2026-05-26 | SpecGantry | v1.3.0 audit `rel_2026.05.26.0911` PASS — C02 Shadowing + Research sections (F06/F07); TUI visual overhaul; contextual guidance copy; 0 SEV-1/SEV-2; 6 SEV-3; go.sh unchanged |
 
 > **Status key:** ⬜ Not started · 🔄 In progress · ✅ Complete · 🔴 Blocked
 
@@ -32,7 +32,7 @@ license: Apache-2.0 (see LICENSE in project root)
 | **Component** | **Status** | **Design started** | **Design ready** | **Dev started** | **Dev complete** | **Blocked by** | **Notes** |
 | :------------ | :--------: | :----------------: | :--------------: | :-------------: | :--------------: | :------------- | :-------- |
 | C01 CLI Shell | ✅ | 2026-05-24 | 2026-05-24 | 2026-05-24 | 2026-05-24 | | |
-| C02 Student Profile | ✅ | 2026-05-24 | 2026-05-25 | 2026-05-24 | 2026-05-25 | | UX defect fix: enquirer → ink full-screen TUI (ink@7 + @inkjs/ui@2); tsc clean, lint clean |
+| C02 Student Profile | ✅ | 2026-05-24 | 2026-05-26 | 2026-05-24 | 2026-05-26 | | C02-F06 Shadowing + C02-F07 Research sections added; tsc clean |
 | C03 University Profile | ✅ | 2026-05-24 | 2026-05-24 | 2026-05-24 | 2026-05-24 | | |
 | C04 Guidance Engine | ✅ | 2026-05-24 | 2026-05-24 | 2026-05-24 | 2026-05-24 | | |
 | C05 Essay Advisor | ✅ | 2026-05-24 | 2026-05-24 | 2026-05-24 | 2026-05-24 | | |
@@ -71,7 +71,8 @@ license: Apache-2.0 (see LICENSE in project root)
 | v1.0.1 | [-] Deprecated | 2026-05-25 | | Generic AI personas. Superseded by v1.0.2. Audit `rel_2026.05.25.1130`. |
 | v1.0.2 | [-] Deprecated | 2026-05-25 | | Patch release — senior AO persona overhaul across all 4 prompt files. No TypeScript or schema changes. Audit `rel_2026.05.25.1600` PASS. Superseded by v1.1.0. |
 | v1.1.0 | [-] Deprecated | 2026-05-25 | 2026-05-25 | Minor release — C02 full redesign: nested menu UX, JSON sidecar, per-field completion tracking, Gemini enhancement on finalize, ESLint added. Audit `rel_2026.05.25.1601` PASS. Superseded by v1.2.0. |
-| v1.2.0 | [X] Active — Ready to Deploy | 2026-05-25 | | Patch release — full-screen ink TUI for C02 + C05; shared `src/utils/tui.tsx`; "Back as separator" defect fixed. Audit `rel_2026.05.25.2149` PASS. |
+| v1.2.0 | [-] Deprecated | 2026-05-25 | | Patch release — full-screen ink TUI for C02 + C05; shared `src/utils/tui.tsx`; "Back as separator" defect fixed. Audit `rel_2026.05.25.2149` PASS. Superseded by v1.3.0. |
+| v1.3.0 | [X] Active — Ready to Deploy | 2026-05-26 | | Minor release — C02 Shadowing (F06) + Research (F07) sections; TUI visual overhaul (wordmark header, dot-leaders, emoji indicators, magenta cursor, pill footer); contextual guidance copy. Audit `rel_2026.05.26.0911` PASS. |
 
 ---
 

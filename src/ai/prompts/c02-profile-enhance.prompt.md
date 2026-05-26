@@ -22,6 +22,8 @@ Return the same JSON structure you receive, with these changes applied:
 **Descriptive fields to reframe (all others: fix errors only):**
 - `extracurriculars[].description` — make the student's impact and role concrete and specific
 - `awards[].description` — highlight the significance from the student's perspective
+- `shadowing[].description` — make observations and learning concrete and specific; use honest first-person voice
+- `research[].description` — highlight the student's specific contribution and skills demonstrated; honest first-person voice
 - `personalStatementSummary` — sharpen the themes; make them specific and grounded
 
 **Critical rules:**
@@ -33,7 +35,7 @@ Return the same JSON structure you receive, with these changes applied:
 - Keep descriptions concise — do not pad or inflate length
 
 **Fields to preserve exactly (do not modify):**
-`gradYear`, `gpaWeighted`, `gpaUnweighted`, `classRank`, `sat` (all subfields), `act` (all subfields), `apScores[].score`, `ibScores[].score`, `extracurriculars[].yearsInvolved`, `extracurriculars[].hoursPerWeek`, `awards[].level`, `awards[].year`, `generatedDate`, `lastUpdated`, `fieldStatus`
+`gradYear`, `gpaWeighted`, `gpaUnweighted`, `classRank`, `sat` (all subfields), `act` (all subfields), `apScores[].score`, `ibScores[].score`, `extracurriculars[].yearsInvolved`, `extracurriculars[].hoursPerWeek`, `awards[].level`, `awards[].year`, `shadowing[].organization`, `shadowing[].field`, `shadowing[].hoursTotal`, `shadowing[].period`, `research[].projectTitle`, `research[].institution`, `research[].mentorName`, `research[].period`, `research[].hoursPerWeek`, `generatedDate`, `lastUpdated`, `fieldStatus`
 
 **Output format:**
 Return ONLY a valid JSON object with the exact same structure as the input. No explanation, no markdown fences, no commentary — just the JSON.

@@ -13,35 +13,55 @@ export interface SelectItem {
   separator?: boolean;
 }
 
+// ─── Dot-leader alignment helper ─────────────────────────────────────────────
+// Pads label to `width` with · characters, then appends status.
+export function dotLeader(label: string, status: string, width = 28): string {
+  const gap = Math.max(2, width - label.length);
+  return `${label}${'·'.repeat(gap)}${status}`;
+}
+
 // ─── Layout ───────────────────────────────────────────────────────────────────
 
-interface ProfileScreenProps {
+interface AppScreenProps {
   subtitle: string;
   contextLine?: string;
+  hint?: string;
   children: React.ReactNode;
   footerHint?: string;
 }
 
-export function AppScreen({ subtitle, contextLine, children, footerHint }: ProfileScreenProps) {
-  const cols = process.stdout.columns ?? 80;
-  const divider = '─'.repeat(Math.min(cols - 4, 76));
+export function AppScreen({ subtitle, contextLine, hint, children, footerHint }: AppScreenProps) {
+  const cols = Math.min(process.stdout.columns ?? 80, 100);
+  const bar = '▓▒░' + '─'.repeat(Math.max(0, cols - 10)) + '░▒▓';
+
   return (
     <Box flexDirection="column" minHeight={process.stdout.rows ?? 24}>
-      {/* HEADER */}
+
+      {/* HEADER — compact wordmark */}
       <Box flexDirection="column" paddingX={3} paddingTop={1} paddingBottom={0}>
-        <Text bold color="cyan">{'  ██████╗  ██████╗'}</Text>
-        <Text bold color="cyan">{'  ██╔══██╗██╔═══██╗   ao — Admissions Officer'}</Text>
-        <Text bold color="cyan">{'  ███████║██║   ██║'}</Text>
-        <Text bold color="cyan">{'  ██╔══██║██║   ██║'}</Text>
-        <Text bold color="cyan">{'  ██║  ██║╚██████╔╝   '}<Text color="white" bold>{subtitle}</Text></Text>
-        <Text bold color="cyan">{'  ╚═╝  ╚═╝ ╚═════╝'}</Text>
+        <Box>
+          <Text bold color="magenta">ao </Text>
+          <Text bold color="white">Admissions Officer  </Text>
+          <Text dimColor color="magenta">/ </Text>
+          <Text bold color="cyan"> {subtitle}</Text>
+        </Box>
+        <Box paddingTop={0}>
+          <Text color="magenta">{bar}</Text>
+        </Box>
       </Box>
-      <Box paddingX={3} paddingBottom={1}>
-        <Text dimColor>{divider}</Text>
-      </Box>
+
+      {/* STUDENT NAME + COMPLETION PILL */}
       {contextLine !== undefined && contextLine !== '' && (
-        <Box paddingX={4} paddingBottom={1}>
-          <Text bold color="white">  {contextLine}</Text>
+        <Box paddingX={5} paddingTop={1} paddingBottom={0}>
+          <Text color="white" bold>  {contextLine}</Text>
+        </Box>
+      )}
+
+      {/* GUIDANCE HINT — callout box */}
+      {hint !== undefined && hint !== '' && (
+        <Box paddingX={5} paddingTop={1} paddingBottom={0}>
+          <Text color="yellow" dimColor>  ╌ </Text>
+          <Text color="yellow" dimColor>{hint}</Text>
         </Box>
       )}
 
@@ -51,29 +71,31 @@ export function AppScreen({ subtitle, contextLine, children, footerHint }: Profi
       </Box>
 
       {/* FOOTER */}
-      <Box paddingX={4} paddingBottom={1}>
-        <Text dimColor>{divider}</Text>
+      <Box paddingX={5} paddingBottom={1}>
+        <Text dimColor color="magenta">  [ ↑↓ ] </Text>
+        <Text dimColor> navigate  </Text>
+        <Text dimColor color="magenta">[ ↵ ] </Text>
+        <Text dimColor> {footerHint ?? 'select'}  </Text>
+        <Text dimColor color="magenta">[ esc ] </Text>
+        <Text dimColor> back</Text>
       </Box>
-      <Box paddingX={4} paddingBottom={1}>
-        <Text dimColor>{footerHint ?? '  ↑ ↓  navigate    Enter  select'}</Text>
-      </Box>
+
     </Box>
   );
 }
 
 // ─── Custom spacious select ───────────────────────────────────────────────────
 
-// Separator items are rendered as dimmed divider lines and skipped by navigation.
+// Separator items render as a full-width dimmed rule; navigation skips them.
 export function SpaciousSelect({ items, onSelect }: { items: SelectItem[]; onSelect: (val: string) => void }) {
   const navigable = items.filter(i => !i.separator);
   const [cursor, setCursor] = useState(0);
+  const cols = Math.min(process.stdout.columns ?? 80, 100);
 
   useInput((_ch, key) => {
-    if (key.upArrow) {
-      setCursor(c => (c - 1 + navigable.length) % navigable.length);
-    } else if (key.downArrow) {
-      setCursor(c => (c + 1) % navigable.length);
-    } else if (key.return) {
+    if (key.upArrow)   setCursor(c => (c - 1 + navigable.length) % navigable.length);
+    if (key.downArrow) setCursor(c => (c + 1) % navigable.length);
+    if (key.return) {
       const selected = navigable[cursor];
       if (selected) onSelect(selected.value);
     }
@@ -85,18 +107,26 @@ export function SpaciousSelect({ items, onSelect }: { items: SelectItem[]; onSel
       {items.map((item, i) => {
         if (item.separator) {
           return (
-            <Box key={i} paddingLeft={2}>
-              <Text dimColor>{'  ─────────────────────────────────'}</Text>
+            <Box key={i} paddingLeft={2} paddingTop={1} paddingBottom={1}>
+              <Text dimColor>{'  ' + '╌'.repeat(Math.min(cols - 10, 50))}</Text>
             </Box>
           );
         }
         navIdx++;
         const isActive = navIdx === cursor;
         return (
-          <Box key={i} paddingLeft={2}>
-            <Text bold={isActive} color={isActive ? 'cyan' : undefined}>
-              {isActive ? '❯  ' : '   '}{item.label}
-            </Text>
+          <Box key={i} paddingLeft={2} paddingBottom={0}>
+            {isActive
+              ? (
+                <Text>
+                  <Text bold color="magenta">▌ </Text>
+                  <Text bold color="magenta">{item.label}</Text>
+                </Text>
+              )
+              : (
+                <Text color="white" dimColor>{'  '}{item.label}</Text>
+              )
+            }
           </Box>
         );
       })}
@@ -111,6 +141,7 @@ export function waitForSelect(
   subtitle: string,
   contextLine?: string,
   completionPill?: string,
+  hint?: string,
 ): Promise<string> {
   const ctx = completionPill
     ? `${contextLine ?? ''}   ${completionPill}`
@@ -120,7 +151,7 @@ export function waitForSelect(
     function SelectScreen() {
       const { exit } = useApp();
       return (
-        <AppScreen subtitle={subtitle} contextLine={ctx}>
+        <AppScreen subtitle={subtitle} contextLine={ctx} hint={hint}>
           <SpaciousSelect
             items={items}
             onSelect={val => {
@@ -139,6 +170,7 @@ export function waitForText(
   initial: string,
   subtitle: string,
   contextLine?: string,
+  hint?: string,
 ): Promise<string> {
   return new Promise(resolve => {
     function InputScreen() {
@@ -148,13 +180,15 @@ export function waitForText(
         if (key.return) { exit(); resolve(value); }
       });
       return (
-        <AppScreen subtitle={subtitle} contextLine={contextLine} footerHint="  Type your answer    Enter  confirm">
-          <Box marginBottom={1} paddingLeft={2}>
-            <Text bold color="cyan">{prompt} </Text>
+        <AppScreen subtitle={subtitle} contextLine={contextLine} hint={hint} footerHint="confirm">
+          <Box paddingLeft={2} paddingBottom={1}>
+            <Text bold color="cyan">  › </Text>
+            <Text bold color="white">{prompt}</Text>
           </Box>
-          <Box paddingLeft={2}>
+          <Box paddingLeft={2} paddingBottom={1}>
+            <Text color="magenta" bold>  ❯ </Text>
             <TextInput
-              placeholder=""
+              placeholder="type here…"
               defaultValue={initial}
               onChange={setValue}
               onSubmit={val => { exit(); resolve(val); }}

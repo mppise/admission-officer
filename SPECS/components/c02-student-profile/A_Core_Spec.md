@@ -15,6 +15,8 @@ Collects a student's holistic academic and extracurricular profile through a nes
 | `Complete` | C02-F03 | Display the stored student profile markdown to stdout | P1 | REQ-0003 | - |
 | `Complete` | C02-F04 | On Finalize: enhance all text fields via Gemini (honest student voice, no marketing tone), then generate `profile.md` from enhanced data — raw `profile.json` is never modified | P1 | REQ-0013 | - |
 | `Complete` | C02-F05 | Write `profile.json` after every individual field input — never lose data mid-session | P1 | REQ-0001 | - |
+| `Complete` | C02-F06 | Capture shadowing experiences (organization, field, hours, period, description) via list management TUI; skippable per entry and as a whole section | P2 | REQ-0001 | - |
+| `Complete` | C02-F07 | Capture research experiences (project title, institution, mentor, period, hours/week, description) via list management TUI; skippable per entry and as a whole section | P2 | REQ-0001 | - |
 
 > ⚠️ Revised 2026-05-25: C02-F01 and C02-F02 revised — `enquirer` replaced with `ink` + `@inkjs/ui` for full-screen, large-font TUI. All menu logic and data flows are preserved; only the rendering layer changes. Decision ref: D-PRODUCT-AO000001, D-TECH-AO000008, D-TECH-AO000009.
 
@@ -68,6 +70,8 @@ Every screen occupies the full terminal viewport. Each screen has three zones:
      Standardized Tests                   ○ not started
      Extracurriculars                     ✓ complete
      Awards & Recognitions                ○ not started
+     Shadowing Experiences                ○ not started
+     Research Experiences                 ○ not started
      ─────────────────────────────────────────────────────
      Finalize & Save                      (complete all sections first)
      Quit without saving
@@ -193,6 +197,39 @@ For skippable fields: two actions are offered after input — `Enter value` and 
 | Field | Prompt type | Skippable? | Notes |
 | :---- | :---------- | :--------- | :---- |
 | `awards` | list | Yes | awardName, level (select), year, description per entry |
+
+### Section 6 — Shadowing Experiences
+
+| Field | Prompt type | Skippable? | Notes |
+| :---- | :---------- | :--------- | :---- |
+| `shadowing` | list | Yes | organization, field, hoursTotal, period, description per entry |
+
+Each shadowing entry sub-fields:
+
+| Sub-field | Prompt type | Skippable? | Notes |
+| :-------- | :---------- | :--------- | :---- |
+| `organization` | `input` | No | Where the shadowing took place (e.g., "Mass General Hospital") |
+| `field` | `input` | No | Discipline or department (e.g., "Cardiology", "Environmental Law") |
+| `hoursTotal` | `input` | Yes | Total hours logged (free text, e.g., "40") |
+| `period` | `input` | No | Time period (e.g., "Summer 2023") |
+| `description` | `input` | No | What the student observed or did; enhanced by LLM at Finalize |
+
+### Section 7 — Research Experiences
+
+| Field | Prompt type | Skippable? | Notes |
+| :---- | :---------- | :--------- | :---- |
+| `research` | list | Yes | projectTitle, institution, mentorName, period, hoursPerWeek, description per entry |
+
+Each research entry sub-fields:
+
+| Sub-field | Prompt type | Skippable? | Notes |
+| :-------- | :---------- | :--------- | :---- |
+| `projectTitle` | `input` | No | Title or brief name of the research |
+| `institution` | `input` | No | Lab, university, organisation, or "Independent" |
+| `mentorName` | `input` | Yes | PI or supervisor name |
+| `period` | `input` | No | Time period (e.g., "June–August 2024") |
+| `hoursPerWeek` | `input` | Yes | Approximate hours per week |
+| `description` | `input` | No | Student's role and key contribution; enhanced by LLM at Finalize |
 
 ---
 

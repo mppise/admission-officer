@@ -52,6 +52,25 @@ showStudentProfile(name: string): Promise<{ markdownPath: string }>
   "awards": [
     { "awardName": "string", "level": "string", "year": "string", "description": "string" }
   ],
+  "shadowing": [
+    {
+      "organization": "string",
+      "field": "string",
+      "hoursTotal": "string",
+      "period": "string",
+      "description": "string"
+    }
+  ],
+  "research": [
+    {
+      "projectTitle": "string",
+      "institution": "string",
+      "mentorName": "string",
+      "period": "string",
+      "hoursPerWeek": "string",
+      "description": "string"
+    }
+  ],
   "generatedDate": "string",
   "lastUpdated": "string",
   "fieldStatus": {
@@ -70,7 +89,9 @@ showStudentProfile(name: string): Promise<{ markdownPath: string }>
     "apScores": "pending | set | skipped",
     "ibScores": "pending | set | skipped",
     "extracurriculars": "pending | set | skipped",
-    "awards": "pending | set | skipped"
+    "awards": "pending | set | skipped",
+    "shadowing": "pending | set | skipped",
+    "research": "pending | set | skipped"
   }
 }
 ```
@@ -160,6 +181,20 @@ showStudentProfile(name: string): Promise<{ markdownPath: string }>
 
 ---
 
+## Shadowing Experiences
+
+| Organization | Field | Hours | Period | Description |
+| :----------- | :---- | :---- | :----- | :---------- |
+
+---
+
+## Research Experiences
+
+| Project | Institution | Mentor | Period | Hrs/Week | Description |
+| :------ | :---------- | :----- | :----- | :------- | :---------- |
+
+---
+
 ## Personal Statement
 
 **Key Themes / Summary:**
@@ -195,7 +230,7 @@ Note: C04, C05, C06 consume `profile.md` only. `profile.json` is internal to C02
 
 These are factual/numeric — any change would be a data integrity violation:
 
-`name`, `gradYear`, `highSchool`, `intendedMajors[]`, `gpaWeighted`, `gpaUnweighted`, `classRank`, `sat.*`, `act.*`, `apScores[].subject`, `apScores[].score`, `ibScores[].subject`, `ibScores[].score`, `awards[].level`, `awards[].year`, `extracurriculars[].yearsInvolved`, `extracurriculars[].hoursPerWeek`, `generatedDate`, `lastUpdated`
+`name`, `gradYear`, `highSchool`, `intendedMajors[]`, `gpaWeighted`, `gpaUnweighted`, `classRank`, `sat.*`, `act.*`, `apScores[].subject`, `apScores[].score`, `ibScores[].subject`, `ibScores[].score`, `awards[].level`, `awards[].year`, `extracurriculars[].yearsInvolved`, `extracurriculars[].hoursPerWeek`, `shadowing[].organization`, `shadowing[].field`, `shadowing[].hoursTotal`, `shadowing[].period`, `research[].projectTitle`, `research[].institution`, `research[].mentorName`, `research[].period`, `research[].hoursPerWeek`, `generatedDate`, `lastUpdated`
 
 ### Fields enhanced by LLM
 
@@ -207,6 +242,8 @@ These are factual/numeric — any change would be a data integrity violation:
 | `extracurriculars[].description` | Correct grammar/spelling; reframe as concrete student strength in honest first-person voice; no superlatives or marketing language |
 | `awards[].awardName` | Fix spelling/capitalisation only |
 | `awards[].description` | Correct grammar/spelling; highlight significance from student's perspective; honest voice |
+| `shadowing[].description` | Correct grammar/spelling; make observations and learning concrete and specific; honest first-person voice |
+| `research[].description` | Correct grammar/spelling; highlight the student's specific contribution and skills demonstrated; honest first-person voice |
 
 ### Prompt contract
 
