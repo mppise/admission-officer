@@ -9,7 +9,7 @@ license: Apache-2.0 (see LICENSE in project root)
 
 > **Overall health:** 🟢 On Track
 > **Last updated:** 2026-05-25
-> **Active phase:** Deployment Readiness — v1.1.0 ready to deploy
+> **Active phase:** Deployment Readiness — v1.2.0 audit PASS, ready to deploy
 
 ---
 
@@ -21,7 +21,7 @@ license: Apache-2.0 (see LICENSE in project root)
 | Planning | ✅ | 2026-05-24 | 2026-05-24 | SpecGantry | B_Architecture.md finalized; 11 decisions approved; 5 risks accepted |
 | Detailed Design | ✅ | 2026-05-24 | 2026-05-24 | SpecGantry | All 6 components specified and ready |
 | Development | ✅ | 2026-05-24 | 2026-05-25 | SpecGantry | All 6 components implemented; tsc clean |
-| Deployment Readiness | ✅ | 2026-05-25 | 2026-05-25 | SpecGantry | v1.1.0 audit `rel_2026.05.25.1601` PASS — C02 redesign; 0 SEV-1/SEV-2; 3 SEV-3; go.sh unchanged (version-agnostic) |
+| Deployment Readiness | ✅ | 2026-05-25 | 2026-05-25 | SpecGantry | v1.2.0 audit `rel_2026.05.25.2149` PASS — ink TUI migration (C02 + C05); 0 SEV-1/SEV-2; 5 SEV-3; go.sh unchanged (version-agnostic) |
 
 > **Status key:** ⬜ Not started · 🔄 In progress · ✅ Complete · 🔴 Blocked
 
@@ -32,7 +32,7 @@ license: Apache-2.0 (see LICENSE in project root)
 | **Component** | **Status** | **Design started** | **Design ready** | **Dev started** | **Dev complete** | **Blocked by** | **Notes** |
 | :------------ | :--------: | :----------------: | :--------------: | :-------------: | :--------------: | :------------- | :-------- |
 | C01 CLI Shell | ✅ | 2026-05-24 | 2026-05-24 | 2026-05-24 | 2026-05-24 | | |
-| C02 Student Profile | ✅ | 2026-05-24 | 2026-05-25 | 2026-05-24 | 2026-05-25 | | Full redesign: nested menu UX, JSON sidecar, per-field completion tracking, Gemini enhancement on finalize |
+| C02 Student Profile | ✅ | 2026-05-24 | 2026-05-25 | 2026-05-24 | 2026-05-25 | | UX defect fix: enquirer → ink full-screen TUI (ink@7 + @inkjs/ui@2); tsc clean, lint clean |
 | C03 University Profile | ✅ | 2026-05-24 | 2026-05-24 | 2026-05-24 | 2026-05-24 | | |
 | C04 Guidance Engine | ✅ | 2026-05-24 | 2026-05-24 | 2026-05-24 | 2026-05-24 | | |
 | C05 Essay Advisor | ✅ | 2026-05-24 | 2026-05-24 | 2026-05-24 | 2026-05-24 | | |
@@ -49,6 +49,7 @@ license: Apache-2.0 (see LICENSE in project root)
 | :------- | :-------- | :------------ | :----------------- | :--------- | :--------------- | :----------------- |
 | 2026-05-25 | Development | C02 Student Profile | Full redesign: linear wizard replaced with nested menu-driven UX; JSON sidecar for lossless persistence; per-field completion tracking with finalization gate; LLM enhancement (Gemini) at finalize renders honest student-voice profile.md without mutating raw profile.json. Triggered by data-loss bug when editing existing profiles. | Significant — full rewrite of C02 source; new prompt file; Gemini dependency added to C02; profile.json schema extended with fieldStatus map | — | — | Page extraction now mines implicit selection signals; guidance report now cross-references student profile against AO reward criteria; essay advisor now gives concrete opening moves and fit-signal explanations. No TypeScript or schema changes. | Prompt-only; no `./src/components/` or spec changes; output quality improvement only | — | — |
 | 2026-05-25 | Deployment Readiness | C06 PDF Exporter | `puppeteer` missing from `package.json` dependencies caused clean-install build to fail (TS2307). Manifest patched: added `puppeteer@^23.11.1`; `postinstall` now installs both Playwright and Puppeteer Chromium binaries. Code and specs unchanged. Prior audit `rel_2026.05.25.1500` superseded by `rel_2026.05.25.1123`. | Manifest-only; no `./src/` or spec changes; first-install footprint grows by ~150 MB | D-TECH-AO000006 | A-EX-AOIDEATE1 |
+| 2026-05-25 | Development | C02 + C05 + shared tui.tsx | UX defect fix: "Back rendered as non-selectable separator" in C02. Resolution: enquirer fully removed from C02 and C05; shared `src/utils/tui.tsx` created with ink-based full-screen TUI (AppScreen, SpaciousSelect, waitForSelect/waitForText/waitForConfirm). C05 Essay Advisor migrated to tui.tsx helpers for consistent full-screen experience. | Moderate — new shared utility module; ink@7 + react@19 + @inkjs/ui@2 added as runtime deps; tsconfig + eslint updated for TSX; C02 renamed index.ts → index.tsx | D-PRODUCT-AO000001, D-TECH-AO000008, D-TECH-AO000009, D-TECH-AO000010 | — |
 
 ---
 
@@ -69,7 +70,8 @@ license: Apache-2.0 (see LICENSE in project root)
 | v1.0.0 | [-] Deprecated | 2026-05-25 | 2026-05-25 | Published broken — missing `puppeteer` in `package.json`. Superseded by v1.0.1. Audit `rel_2026.05.25.1123`. |
 | v1.0.1 | [-] Deprecated | 2026-05-25 | | Generic AI personas. Superseded by v1.0.2. Audit `rel_2026.05.25.1130`. |
 | v1.0.2 | [-] Deprecated | 2026-05-25 | | Patch release — senior AO persona overhaul across all 4 prompt files. No TypeScript or schema changes. Audit `rel_2026.05.25.1600` PASS. Superseded by v1.1.0. |
-| v1.1.0 | [X] Active — Ready to Deploy | 2026-05-25 | | Minor release — C02 full redesign: nested menu UX, JSON sidecar, per-field completion tracking, Gemini enhancement on finalize, ESLint added. Audit `rel_2026.05.25.1601` PASS. |
+| v1.1.0 | [-] Deprecated | 2026-05-25 | 2026-05-25 | Minor release — C02 full redesign: nested menu UX, JSON sidecar, per-field completion tracking, Gemini enhancement on finalize, ESLint added. Audit `rel_2026.05.25.1601` PASS. Superseded by v1.2.0. |
+| v1.2.0 | [X] Active — Ready to Deploy | 2026-05-25 | | Patch release — full-screen ink TUI for C02 + C05; shared `src/utils/tui.tsx`; "Back as separator" defect fixed. Audit `rel_2026.05.25.2149` PASS. |
 
 ---
 

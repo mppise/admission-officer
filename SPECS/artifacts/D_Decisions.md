@@ -19,7 +19,7 @@ license: Apache-2.0 (see LICENSE in project root)
 
 | Total | Pending `[ ]` | Approved `[X]` | Rejected `[-]` | Deferred `[>]` |
 | :---: | :-----------: | :------------: | :------------: | :------------: |
-| 11 | 0 | 11 | 0 | 0 |
+| 14 | 0 | 14 | 0 | 0 |
 
 ---
 
@@ -45,12 +45,15 @@ license: Apache-2.0 (see LICENSE in project root)
 | `[X]` | D-TECH-AO000004 | `playwright` (headless Chromium) for university website scraping | University websites are predominantly JS-rendered SPAs; static parsers miss dynamic content | `cheerio` (fails on JS-rendered content), `scrapy` (Python) | ~100MB browser binary; slower cold start for `--university-profile --build` | DevAgent | Confirmed during Planning |
 | `[X]` | D-TECH-AO000005 | `@google/generative-ai` as Gemini SDK | Official SDK; handles auth, retries, and response parsing | Raw `fetch` (no type safety, manual auth) | All Gemini calls go through this SDK | DevAgent | Confirmed during Planning |
 | `[X]` | D-TECH-AO000006 | `puppeteer` for PDF export | HTML→PDF rendering; no external service; well-maintained | `markdown-pdf` (unmaintained), `weasyprint` (Python dependency) | Used exclusively in C06; markdown→HTML→PDF pipeline via `marked` + `puppeteer` | DevAgent | Confirmed during Planning |
-| `[X]` | D-TECH-AO000007 | `dotenv` for environment/config loading | Standard `.env` loading; zero config | Custom env parser (unnecessary) | `GEMINI_API_KEY` and `GEMINI_MODEL` loaded from `.env` at startup | DevAgent | Confirmed during Planning |
+| `[X]` | D-TECH-AO000008 | `ink` (v5.x) for full-screen TUI rendering in C02 | ESM-native; actively maintained; React component model maps cleanly to menu hierarchy; pairs with `@inkjs/ui` for Select/TextInput primitives | `blessed` (CJS, abandoned), raw ANSI escapes (insufficient richness) | C02 only; adds `ink`, `react`, `react-dom`, `@inkjs/ui`, `@types/react` to dependencies | DevAgent | Approved 2026-05-25 |
+| `[X]` | D-TECH-AO000009 | `@inkjs/ui` for ink-native Select and TextInput components | Official ink component library; provides accessible Select list and TextInput matching prior `enquirer` UX contract | Custom ink components (unnecessary effort), keeping enquirer (incompatible with ink's terminal ownership) | Replaces `enquirer` in C02 only; `enquirer` remains approved for C03 | DevAgent | Approved 2026-05-25 |
+| `[X]` | D-TECH-AO000010 | `enquirer` retained for C03 University Profile only | C03 was not in scope for this UX defect fix; no regression introduced | Replacing C03 with ink (out of scope) | No change to C03 source | DevAgent | Approved 2026-05-25 |
 
 ## Product & UX
 
 | Status | ID | Decision | Rationale | Alternatives Rejected | Impact | Owner | Notes |
 | :----: | :- | :------- | :-------- | :-------------------- | :----- | :---- | :---- |
+| `[X]` | D-PRODUCT-AO000001 | Use `ink` (React-based TUI) for C02 Student Profile full-screen menu UX | ESM-native, actively maintained, de facto standard for rich Node.js CLI UIs; delivers full-screen layout with large headers and visual breathing room | `blessed` (CJS-only, unmaintained since 2019), ANSI escapes only (insufficient visual richness) | `enquirer` replaced by `@inkjs/ui` in C02 only; all other components unaffected; adds `ink`, `react`, `@inkjs/ui` to production dependencies | DevAgent | Approved 2026-05-25 — Detailed Design phase, C02 UX defect fix |
 
 ## Data & Storage
 
@@ -86,3 +89,4 @@ license: Apache-2.0 (see LICENSE in project root)
 | ID | Description | Date | Author |
 | :- | :---------- | :--: | :----- |
 | CHG-001 | Initial decisions logged during Planning | 2026-05-24 | SpecGantry |
+| CHG-002 | D-PRODUCT-AO000001, D-TECH-AO000008–010 added for C02 UX defect fix (ink-based full-screen menus) | 2026-05-25 | SpecGantry |

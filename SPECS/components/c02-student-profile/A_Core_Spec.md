@@ -10,85 +10,143 @@ Collects a student's holistic academic and extracurricular profile through a nes
 
 | Status | ID | Description | Priority | Req Ref | Doc Level |
 | :----- | :- | :---------- | :------- | :------ | :-------- |
-| `Ready` | C02-F01 | Navigate and edit the student profile via a nested menu; track completion status per field/section; gate finalization until all fields are `set` or `skipped` | P1 | REQ-0001, REQ-0002 | - |
-| `Ready` | C02-F02 | Load existing `profile.json` on re-entry; resume the same menu with current values pre-filled and completion indicators intact | P1 | REQ-0001 | - |
+| `Complete` | C02-F01 | Navigate and edit the student profile via a full-screen ink-based TUI; track completion status per field/section; gate finalization until all fields are `set` or `skipped` | P1 | REQ-0001, REQ-0002 | - |
+| `Complete` | C02-F02 | Load existing `profile.json` on re-entry; resume the full-screen menu with current values pre-filled and completion indicators intact | P1 | REQ-0001 | - |
 | `Complete` | C02-F03 | Display the stored student profile markdown to stdout | P1 | REQ-0003 | - |
-| `Ready` | C02-F04 | On Finalize: enhance all text fields via Gemini (honest student voice, no marketing tone), then generate `profile.md` from enhanced data — raw `profile.json` is never modified | P1 | REQ-0013 | - |
-| `Ready` | C02-F05 | Write `profile.json` after every individual field input — never lose data mid-session | P1 | REQ-0001 | - |
+| `Complete` | C02-F04 | On Finalize: enhance all text fields via Gemini (honest student voice, no marketing tone), then generate `profile.md` from enhanced data — raw `profile.json` is never modified | P1 | REQ-0013 | - |
+| `Complete` | C02-F05 | Write `profile.json` after every individual field input — never lose data mid-session | P1 | REQ-0001 | - |
+
+> ⚠️ Revised 2026-05-25: C02-F01 and C02-F02 revised — `enquirer` replaced with `ink` + `@inkjs/ui` for full-screen, large-font TUI. All menu logic and data flows are preserved; only the rendering layer changes. Decision ref: D-PRODUCT-AO000001, D-TECH-AO000008, D-TECH-AO000009.
 
 ---
 
 ## Menu Structure
 
+> ⚠️ Revised 2026-05-25: All menus now rendered as full-screen ink components. `enquirer` is no longer used in C02. The menu hierarchy (Level 1 / Level 2 / Level 3) and all completion indicators are preserved; the visual treatment changes to full-screen with a prominent header block.
+
 The interface is fully menu-driven and nested. There is no linear wizard. The same menu is used for both new profiles and edits.
+
+### Screen Layout
+
+Every screen occupies the full terminal viewport. Each screen has three zones:
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│  HEADER ZONE                                                │
+│  ── Large app name + context title ──────────────────────  │
+│  ── Student name + overall completion status ────────────  │
+│                                                             │
+│  MENU / CONTENT ZONE                                        │
+│  ── Selectable list or input field ──────────────────────  │
+│                                                             │
+│  FOOTER ZONE                                                │
+│  ── Keyboard hint: ↑↓ navigate · Enter select · Esc back  │
+└─────────────────────────────────────────────────────────────┘
+```
+
+**Header zone:** Always visible. Renders:
+- App title `ao — Admissions Officer` in bold large text (via `ink` `<Text bold>`)
+- Current screen title (e.g., `Student Profile` or `Academics`) in a dimmed subtitle style
+- Student name and overall completion pill (e.g., `Jane Smith  ●  3 sections pending`)
+
+**Menu/content zone:** Scrollable `<SelectInput>` list (from `@inkjs/ui`) or `<TextInput>` for scalar fields.
+
+**Footer zone:** Static keyboard hint row, always at the bottom.
 
 ### Level 1 — Main Menu
 
 ```
-Student Profile: <name>                    ● 3 sections pending
+╔══════════════════════════════════════════════════════════════╗
+║  ao — Admissions Officer                                     ║
+║  Student Profile                                             ║
+║                                                              ║
+║  Jane Smith                             ● 2 sections pending ║
+╚══════════════════════════════════════════════════════════════╝
 
-  Personal                                 ✓ complete
-  Academics                                ● 2 fields pending
-  Standardized Tests                       ○ not started
-  Extracurriculars                         ✓ complete
-  Awards & Recognitions                    ○ not started
-  Personal Statement                       ○ not started
-  ─────────────────────────────────────
-  Finalize & Save                          (disabled until all ✓ or –)
-  Quit without saving
+  ▶  Personal                             ✓ complete
+     Academics                            ● 2 fields pending
+     Standardized Tests                   ○ not started
+     Extracurriculars                     ✓ complete
+     Awards & Recognitions                ○ not started
+     ─────────────────────────────────────────────────────
+     Finalize & Save                      (complete all sections first)
+     Quit without saving
+
+  ↑↓ navigate · Enter select
 ```
 
-Completion indicators per section:
+Completion indicators per section (unchanged from prior spec):
 - `✓ complete` — all fields in section are `set` or `skipped`
-- `● N fields pending` — section has been partially entered
-- `○ not started` — no fields in section have been touched
-- `– skipped` — user explicitly skipped the entire section
+- `● N fields pending` — section partially answered
+- `○ not started` — no fields touched
+- `– skipped` — user explicitly skipped entire section
+
+`Finalize & Save` rendered in dimmed style with hint text when not yet enabled.
 
 ### Level 2 — Section Menu
 
-Selecting a section opens its field list:
-
 ```
-Academics
+╔══════════════════════════════════════════════════════════════╗
+║  ao — Admissions Officer                                     ║
+║  Academics                                                   ║
+║                                                              ║
+║  Jane Smith                                                  ║
+╚══════════════════════════════════════════════════════════════╝
 
-  GPA (Weighted)          ✓  4.3
-  GPA (Unweighted)        ✓  3.9
-  Class Rank              –  skipped
-  Transcript              ●  2 years added
-  ─────────────────────────────────────
-  Skip entire section
-  Back
+  ▶  GPA (Weighted)              ✓  4.3
+     GPA (Unweighted)            ✓  3.9
+     Class Rank                  –  skipped
+     Transcript                  ●  2 years added
+     ──────────────────────────────────────
+     Skip entire section
+     Back
+
+  ↑↓ navigate · Enter select
 ```
 
-Field indicators:
-- `✓  <value>` — field is set; current value shown inline
-- `–  skipped` — field was explicitly skipped by user
-- `●  <summary>` — list field with N entries
+Field indicators (unchanged):
+- `✓  <value>` — set; value shown inline
+- `–  skipped` — explicitly skipped
+- `●  <summary>` — list with N entries
 - `○` — not yet answered
 
-### Level 3 — Field Edit / List Management
-
-**Scalar field:** Opens an `input` or `select` prompt pre-filled with current value. User edits and confirms → value saved → back to Section Menu.
-
-**Skippable field:** After any scalar prompt, offer `[Enter value / Skip]` — selecting Skip marks the field `skipped`.
-
-**List field (transcript, ECs, awards, AP/IB scores):** Opens a list management sub-menu:
+### Level 3 — Scalar Field Input
 
 ```
-Transcript  (2 entries)
+╔══════════════════════════════════════════════════════════════╗
+║  ao — Admissions Officer                                     ║
+║  Academics › GPA (Weighted)                                  ║
+║                                                              ║
+║  Jane Smith                                                  ║
+╚══════════════════════════════════════════════════════════════╝
 
-  9th Grade   →  4 courses
-  10th Grade  →  3 courses
-  ─────────────────────────
-  Add entry
-  Back
+  Weighted GPA (e.g., 4.3):  █
+
+  [ Enter value ]   [ Skip this field ]
+
+  ↑↓ select action · Enter confirm · Esc back
 ```
 
-Selecting an existing entry opens an edit sub-menu:
+For skippable fields: two actions are offered after input — `Enter value` and `Skip this field` — rendered as a two-item `<SelectInput>`. For non-skippable fields: `<TextInput>` only.
+
+### Level 3 — List Management
+
 ```
-  Edit entry
-  Remove entry
-  Back
+╔══════════════════════════════════════════════════════════════╗
+║  ao — Admissions Officer                                     ║
+║  Extracurriculars                                            ║
+║                                                              ║
+║  Jane Smith                                                  ║
+╚══════════════════════════════════════════════════════════════╝
+
+  ▶  1. Robotics Club — President
+     2. Varsity Swimming — Captain
+     ──────────────────────────────
+     Add activity
+     Skip extracurriculars
+     Back
+
+  ↑↓ navigate · Enter select
 ```
 
 ---
@@ -178,4 +236,4 @@ Each field carries one of three statuses stored in `profile.json`:
 
 ## Execution Mode
 
-Request-driven. Invoked by C01 per user command. Runs within the CLI process. Menu navigation uses Enquirer prompts (async/await). No background processes.
+Request-driven. Invoked by C01 per user command. Runs within the CLI process. Menu navigation uses `ink` React components rendered to the terminal via `ink`'s `render()` function. Each screen is a discrete `render()` call that resolves a promise when the user makes a selection or submits input — enabling the existing async/await menu loop to be preserved. No background processes.

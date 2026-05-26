@@ -1,9 +1,9 @@
-import Enquirer from 'enquirer';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { dataPath, writeFile, readFile, fileExists, listFiles } from '../../utils/fileUtils.js';
 import { djb2Hash, ESSAY_TYPE_SLUGS } from '../../utils/slugUtils.js';
 import { loadPrompt } from '../../ai/promptLoader.js';
 import { getGeminiApiKey, getGeminiModel } from '../../config/env.js';
+import { waitForSelect, waitForText, waitForConfirm } from '../../utils/tui.js';
 
 // ─── Retry helper ─────────────────────────────────────────────────────────────
 
@@ -15,18 +15,6 @@ async function withRetry<T>(fn: () => Promise<T>, label: string): Promise<T> {
     await new Promise(r => setTimeout(r, 30000));
     return await fn();
   }
-}
-
-const enq = new Enquirer();
-
-async function ask(question: { type: string; name: string; message: string; choices?: string[]; initial?: string; validate?: (v: string) => boolean | string }): Promise<string> {
-  const response = await enq.prompt(question) as Record<string, string>;
-  return response[question.name] ?? '';
-}
-
-async function confirm(message: string): Promise<boolean> {
-  const response = await enq.prompt({ type: 'confirm', name: 'value', message }) as { value: boolean };
-  return response.value;
 }
 
 // ─── Public API ───────────────────────────────────────────────────────────────
@@ -44,28 +32,26 @@ export async function buildEssay(studentSlug: string, universitySlug: string): P
     throw new Error(`No university profile found for "${universitySlug}". Run: ao --university-profile --build --domain <domain>`);
   }
 
-  // [C05-F01] Collect essay details via Enquirer
-  console.log('\n── Essay Prompt Collection ───────────────────────────');
+  // [C05-F01] Collect essay details via full-screen TUI
+  const essayType = await waitForSelect(
+    Object.keys(ESSAY_TYPE_SLUGS).map(t => ({ label: t, value: t })),
+    'Essay Advisor › Essay Type',
+    `Student: ${studentSlug}   University: ${universitySlug}`,
+  );
 
-  const essayType = await ask({
-    type: 'select',
-    name: 'essayType',
-    message: 'Essay type:',
-    choices: Object.keys(ESSAY_TYPE_SLUGS),
-  });
+  const essayPrompt = await waitForText(
+    'Paste the full essay prompt (max 1000 chars):',
+    '',
+    'Essay Advisor › Essay Prompt',
+    `${essayType}   Student: ${studentSlug}`,
+  );
 
-  const essayPrompt = await ask({
-    type: 'input',
-    name: 'essayPrompt',
-    message: 'Paste the full essay prompt (max 1000 chars):',
-    validate: (v: string) => v.trim().length > 0 ? true : 'Essay prompt is required.',
-  });
-
-  const wordLimitRaw = await ask({
-    type: 'input',
-    name: 'wordLimit',
-    message: 'Word limit (press Enter to skip):',
-  });
+  const wordLimitRaw = await waitForText(
+    'Word limit (press Enter to skip):',
+    '',
+    'Essay Advisor › Word Limit',
+    `${essayType}   Student: ${studentSlug}`,
+  );
   const wordLimit = wordLimitRaw.trim() || 'Not specified';
 
   // [C05-F01] Generate slug and check for existing file
@@ -76,7 +62,11 @@ export async function buildEssay(studentSlug: string, universitySlug: string): P
   const essayPath = `${essaysDir}/${fileName}`;
 
   if (await fileExists(essayPath)) {
-    const overwrite = await confirm('An essay outline already exists for this prompt. Overwrite?');
+    const overwrite = await waitForConfirm(
+      'An essay outline already exists for this prompt. Overwrite?',
+      'Essay Advisor › Overwrite?',
+      `${essayType}   Student: ${studentSlug}`,
+    );
     if (!overwrite) {
       console.log('No changes made.');
       return { essayPath };
@@ -104,19 +94,17 @@ export async function buildEssay(studentSlug: string, universitySlug: string): P
 
   const result = await withRetry(
     () => model.generateContent(prompt),
-    'Gemini essay generation'
+    'Gemini essay generation',
   );
 
   const essayMarkdown = result.response.text().trim();
 
-  // [C05-F04] Store with disclaimer already embedded by prompt
-  // Add file-level disclaimer if Gemini omitted it (safety net)
+  // [C05-F04] Store with disclaimer
   const disclaimer = `> ⚠️ IMPORTANT: The inspiration samples below are provided to help you understand\n> how to draw on your own experiences. Do NOT submit them as your own work.\n> Use them only as a reference for tone, structure, and how to connect your\n> profile to the prompt. Your essay must be written in your own voice.`;
   const finalMarkdown = essayMarkdown.includes('⚠️ IMPORTANT') ? essayMarkdown : `${disclaimer}\n\n${essayMarkdown}`;
 
   await writeFile(essayPath, finalMarkdown + '\n');
 
-  // Print disclaimer to stdout as well
   console.log('\n⚠️  REMINDER: The inspiration samples in this outline are for reference only.');
   console.log('   Do NOT submit them as your own work. Write your essay in your own voice.\n');
 
@@ -131,7 +119,7 @@ export async function showEssay(studentSlug: string, universitySlug: string): Pr
   if (files.length === 0) {
     throw new Error(
       `No essay outlines found for "${studentSlug}" → "${universitySlug}". ` +
-      `Run: ao --essay --build --student ${studentSlug} --university ${universitySlug}`
+      `Run: ao --essay --build --student ${studentSlug} --university ${universitySlug}`,
     );
   }
 
@@ -139,14 +127,11 @@ export async function showEssay(studentSlug: string, universitySlug: string): Pr
   if (files.length === 1) {
     selectedFile = files[0];
   } else {
-    const enqInstance = new Enquirer();
-    const response = await enqInstance.prompt({
-      type: 'select',
-      name: 'file',
-      message: 'Select an essay outline to view:',
-      choices: files,
-    }) as { file: string };
-    selectedFile = response.file;
+    selectedFile = await waitForSelect(
+      files.map(f => ({ label: f, value: f })),
+      'Essay Advisor › Select Outline',
+      `Student: ${studentSlug}   University: ${universitySlug}`,
+    );
   }
 
   const markdownPath = `${essaysDir}/${selectedFile}`;

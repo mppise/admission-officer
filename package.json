@@ -1,6 +1,6 @@
 {
   "name": "admission-officer",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "description": "Admissions Officer CLI — personalised college admissions guidance for high school students",
   "type": "module",
   "bin": {
@@ -11,7 +11,7 @@
     "prepare": "npm run build",
     "start": "node dist/cli/index.js",
     "typecheck": "tsc --noEmit",
-    "lint": "eslint src/**/*.ts",
+    "lint": "eslint src/**/*.ts src/**/*.tsx",
     "postinstall": "playwright install chromium && puppeteer browsers install chrome"
   },
   "files": [
@@ -34,16 +34,21 @@
   },
   "dependencies": {
     "@google/generative-ai": "^0.21.0",
+    "@inkjs/ui": "^2.0.0",
     "commander": "^12.1.0",
     "dotenv": "^16.4.5",
     "enquirer": "^2.4.1",
+    "ink": "^7.0.4",
     "marked": "^12.0.0",
     "playwright": "^1.44.0",
-    "puppeteer": "^23.11.1"
+    "puppeteer": "^23.11.1",
+    "react": "^19.2.6",
+    "react-dom": "^19.2.6"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
     "@types/node": "^20.14.0",
+    "@types/react": "^19.2.15",
     "@typescript-eslint/eslint-plugin": "^8.60.0",
     "@typescript-eslint/parser": "^8.60.0",
     "eslint": "^10.4.0",
