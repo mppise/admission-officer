@@ -19,7 +19,7 @@ license: Apache-2.0 (see LICENSE in project root)
 
 | Total | Pending `[ ]` | Approved `[X]` | Rejected `[-]` | Deferred `[>]` |
 | :---: | :-----------: | :------------: | :------------: | :------------: |
-| 18 | 0 | 18 | 0 | 0 |
+| 21 | 0 | 21 | 0 | 0 |
 
 ---
 
@@ -60,13 +60,11 @@ license: Apache-2.0 (see LICENSE in project root)
 | `[X]` | D-PRODUCT-AO000001 | Use `ink` (React-based TUI) for C02 Student Profile full-screen menu UX | ESM-native, actively maintained, de facto standard for rich Node.js CLI UIs; delivers full-screen layout with large headers and visual breathing room | `blessed` (CJS-only, unmaintained since 2019), ANSI escapes only (insufficient visual richness) | `enquirer` replaced by `@inkjs/ui` in C02 only; all other components unaffected; adds `ink`, `react`, `@inkjs/ui` to production dependencies | DevAgent | Approved 2026-05-25 — Detailed Design phase, C02 UX defect fix |
 | `[X]` | D-PRODUCT-AO000002 | Drop `dimColor` from hint, footer, and inactive menu rows in shared `tui.tsx`; render the active menu row as bold white-on-black inverted highlight | Dim variant was too low-contrast and hurt readability; inverted highlight gives an unambiguous "selected" affordance without relying on color alone | Keeping dimColor (rejected — readability), magenta or cyan highlight bg (rejected — too loud, DevAgent prefers neutral) | Visual change affects both C02 (C02-F01..F07) and C05 (C05-F01..F05) since they share `tui.tsx`; no code structure change | DevAgent | Approved 2026-05-26 — Detailed Design phase, C02 bug fix |
 | `[X]` | D-PRODUCT-AO000003 | On resume, merge parsed `profile.json` over a fresh `emptyProfile()` shape (generic defaulting) rather than only patching `shadowing`/`research` | Schema growth is ongoing (F06/F07 just added; more likely); generic merge auto-heals any future-added field without per-release migration code | Per-field migration (rejected — fragile, needs new code per schema change), strict schema rejection (rejected — would break existing user profiles) | C02 only; load path in `buildStudentProfile` gains a one-line merge; no on-disk schema change | DevAgent | Approved 2026-05-26 — Detailed Design phase, C02 bug fix |
+| `[X]` | D-PRODUCT-AO000004 | Add "View Profile" to Student Context and "View University" to University Context menus; each calls the existing `showStudentProfile`/`showUniversityProfile` functions then offers the PDF prompt | `showStudentProfile` (C02-F03) and `showUniversityProfile` (C03-F05) already existed but were never wired into C01 menus | Separate "View" route in C01 vs. surfacing on a dedicated screen (unnecessary extra screen) | C01 only — no C02/C03 source changes needed | DevAgent | v2.0.2 bug fix |
+| `[X]` | D-PRODUCT-AO000005 | Esc key fires Back on every screen; on Student Select, Esc calls `process.exit(0)` and footer hint changes to `[ Ctrl+C ] exit` | Footer always showed `[ esc ] back` but `SpaciousSelect` never handled `key.escape` — promise never resolved | Esc fires a special exit-app event globally (rejected — inconsistent with inner-screen behaviour) | `SpaciousSelect` gains `onEscape` prop; `showMenu` resolves `'__esc'` sentinel; `waitForText` resolves empty string on escape; each screen function maps `'__esc'` to its back target | DevAgent | v2.0.2 bug fix |
+| `[X]` | D-PRODUCT-AO000006 | Add `withSpinner<T>(promise, message, subtitle, contextLine?)` to `tui.tsx`; wrap `buildUniversityProfile`, `buildGuidance`, `buildEssay` calls in C01 | Screen went blank during 30–90s AI/scraping operations — appeared hung with no feedback | Per-component stdout logging while ink owns terminal (inconsistent, conflicts with TUI render) | `tui.tsx` gains one new export; C01 wraps three call sites; no changes to C03/C04/C05 | DevAgent | v2.0.2 bug fix |
 
 ## Data & Storage
-
-| Status | ID | Decision | Rationale | Alternatives Rejected | Impact | Owner | Notes |
-| :----: | :- | :------- | :-------- | :-------------------- | :----- | :---- | :---- |
-
-## Security
 
 | Status | ID | Decision | Rationale | Alternatives Rejected | Impact | Owner | Notes |
 | :----: | :- | :------- | :-------- | :-------------------- | :----- | :---- | :---- |
@@ -97,4 +95,5 @@ license: Apache-2.0 (see LICENSE in project root)
 | CHG-001 | Initial decisions logged during Planning | 2026-05-24 | SpecGantry |
 | CHG-002 | D-PRODUCT-AO000001, D-TECH-AO000008–010 added for C02 UX defect fix (ink-based full-screen menus) | 2026-05-25 | SpecGantry |
 | CHG-003 | D-PRODUCT-AO000002, D-PRODUCT-AO000003 added for C02 bug fix (resume crash on F06/F07; tui.tsx visual contrast) | 2026-05-26 | SpecGantry |
-| CHG-004 | CHG-002 menu-driven overhaul: D-ARCH-AO000002–008 added/updated; D-TECH-AO000002/003/008–010 updated; `commander` and `enquirer` removed; ink/tui.tsx promoted to system-wide; `university-ao/` workspace; dated dirs; Config screen | 2026-05-27 | SpecGantry |
+| CHG-004 | CHG-002 menu-driven overhaul: D-ARCH-AO000002-008 added/updated; D-TECH-AO000002/003/008-010 updated; commander and enquirer removed; ink/tui.tsx promoted to system-wide; university-ao/ workspace; dated dirs; Config screen | 2026-05-27 | SpecGantry |
+| CHG-005 | D-PRODUCT-AO000004-006 added for v2.0.2 bug fixes: View Profile/University menus; Esc=Back with process.exit on Student Select; withSpinner for long-running AI calls | 2026-05-27 | SpecGantry |

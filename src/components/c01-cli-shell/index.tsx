@@ -4,12 +4,12 @@ import { render, Box, Text } from 'ink';
 import { promises as fs } from 'fs';
 
 import { bootstrap, workspacePath, getApiKey, getModel, getTokenWindow, getContentBudgetPct, saveConfig, ConfigValidationError } from '../../config/bootstrap.js';
-import { buildStudentProfile, deleteStudentProfile } from '../c02-student-profile/index.js';
-import { buildUniversityProfile, deleteUniversityProfile } from '../c03-university-profile/index.js';
+import { buildStudentProfile, deleteStudentProfile, showStudentProfile } from '../c02-student-profile/index.js';
+import { buildUniversityProfile, deleteUniversityProfile, showUniversityProfile } from '../c03-university-profile/index.js';
 import { buildGuidance, showGuidance, listGuidance } from '../c04-guidance-engine/index.js';
 import { buildEssay, showEssay, listEssays } from '../c05-essay-advisor/index.js';
 import { exportToPdf } from '../c06-pdf-exporter/index.js';
-import { AppScreen, SpaciousSelect, waitForText } from '../../utils/tui.js';
+import { AppScreen, SpaciousSelect, waitForText, withSpinner } from '../../utils/tui.js';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -47,12 +47,14 @@ function maskApiKey(key: string | undefined): string {
 
 // ─── Ink screen helper ────────────────────────────────────────────────────────
 // Renders a SpaciousSelect menu and resolves with the selected value.
+// Resolves '__esc' when the user presses Escape.
 
 function showMenu(
   items: Array<{ label: string; value: string; separator?: boolean }>,
   subtitle: string,
   contextLine?: string,
   errorMsg?: string,
+  footerEsc?: string,
 ): Promise<string> {
   return new Promise(resolve => {
     let resolved = false;
@@ -60,7 +62,7 @@ function showMenu(
       const [, bump] = useState(0);
       void bump;
       return (
-        <AppScreen subtitle={subtitle} contextLine={contextLine}>
+        <AppScreen subtitle={subtitle} contextLine={contextLine} footerEsc={footerEsc}>
           {errorMsg && (
             <Box paddingX={5} paddingBottom={1}>
               <Text color="red">  ⚠ {errorMsg}</Text>
@@ -72,6 +74,12 @@ function showMenu(
               if (!resolved) {
                 resolved = true;
                 resolve(val);
+              }
+            }}
+            onEscape={() => {
+              if (!resolved) {
+                resolved = true;
+                resolve('__esc');
               }
             }}
           />
@@ -97,6 +105,7 @@ function ctx(nav: Nav): string | undefined {
 
 // ─── Screen functions (imperative async) ─────────────────────────────────────
 
+// [C01-F02] Student Select screen
 async function screenStudentSelect(nav: Nav, error?: string): Promise<Nav> {
   const students = await listDir(workspacePath('students'));
   const items = [
@@ -105,8 +114,10 @@ async function screenStudentSelect(nav: Nav, error?: string): Promise<Nav> {
     { label: 'New Student', value: '__new' },
     { label: 'Config', value: '__config' },
   ];
-  const val = await showMenu(items, 'Select Student', undefined, error);
+  // [C01-F09] On Student Select, Esc exits the app; footer shows Ctrl+C instead of esc
+  const val = await showMenu(items, 'Select Student', undefined, error, 'Ctrl+C');
 
+  if (val === '__esc') { process.exit(0); }
   if (val === '__config') {
     return screenConfig(nav);
   }
@@ -133,25 +144,25 @@ async function screenConfig(nav: Nav, error?: string): Promise<Nav> {
   ];
   const val = await showMenu(items, 'Config', undefined, error);
 
-  if (val === '__back') return screenStudentSelect(nav);
+  if (val === '__back' || val === '__esc') return screenStudentSelect(nav);
   if (val === '__edit-key') {
     const newKey = await waitForText('Gemini API Key:', getApiKey() ?? '', 'Config › Edit API Key');
-    process.env.GEMINI_API_KEY = newKey.trim();
+    if (newKey.trim()) process.env.GEMINI_API_KEY = newKey.trim();
     return screenConfig(nav);
   }
   if (val === '__edit-model') {
     const newModel = await waitForText('Gemini Model:', getModel() ?? '', 'Config › Edit Model');
-    process.env.GEMINI_MODEL = newModel.trim();
+    if (newModel.trim()) process.env.GEMINI_MODEL = newModel.trim();
     return screenConfig(nav);
   }
   if (val === '__edit-token-window') {
     const raw = await waitForText('Token Window (tokens):', String(getTokenWindow()), 'Config › Edit Token Window');
-    process.env.GEMINI_TOKEN_WINDOW = raw.trim();
+    if (raw.trim()) process.env.GEMINI_TOKEN_WINDOW = raw.trim();
     return screenConfig(nav);
   }
   if (val === '__edit-content-budget') {
     const raw = await waitForText('Content Budget % (1–100):', String(getContentBudgetPct()), 'Config › Edit Content Budget %');
-    process.env.GEMINI_CONTENT_BUDGET_PCT = raw.trim();
+    if (raw.trim()) process.env.GEMINI_CONTENT_BUDGET_PCT = raw.trim();
     return screenConfig(nav);
   }
   if (val === '__save') {
@@ -166,6 +177,7 @@ async function screenConfig(nav: Nav, error?: string): Promise<Nav> {
   return screenStudentSelect(nav);
 }
 
+// [C01-F04] Student Context screen
 async function screenStudentContext(nav: Nav, error?: string): Promise<Nav> {
   const universities = await listDir(workspacePath('students', nav.studentSlug!, 'universities'));
   const items = [
@@ -173,13 +185,22 @@ async function screenStudentContext(nav: Nav, error?: string): Promise<Nav> {
     ...(universities.length > 0 ? [{ label: '──────────────────────', value: '', separator: true }] : []),
     { label: 'New University', value: '__new-uni' },
     { label: '──────────────────────', value: '', separator: true },
+    { label: 'View Profile', value: '__view' },
     { label: 'Update Profile', value: '__update' },
     { label: 'Delete Profile', value: '__delete' },
     { label: 'Back', value: '__back' },
   ];
   const val = await showMenu(items, 'Student', ctx(nav), error);
 
-  if (val === '__back') return screenStudentSelect({ studentSlug: undefined, universitySlug: undefined });
+  if (val === '__back' || val === '__esc') return screenStudentSelect({ studentSlug: undefined, universitySlug: undefined });
+  if (val === '__view') {
+    try {
+      const { markdownPath } = await showStudentProfile(nav.studentSlug!);
+      return screenPdfPrompt(nav, markdownPath, 'student');
+    } catch (err) {
+      return screenStudentContext(nav, err instanceof Error ? err.message : String(err));
+    }
+  }
   if (val === '__update') {
     await buildStudentProfile(nav.studentSlug);
     return screenStudentContext(nav);
@@ -202,18 +223,28 @@ async function screenDeleteStudent(nav: Nav): Promise<Nav> {
   return screenStudentContext(nav);
 }
 
+// [C01-F05] University Context screen
 async function screenUniversityContext(nav: Nav, error?: string): Promise<Nav> {
   const items = [
     { label: 'Guidance', value: '__guidance' },
     { label: 'Essay', value: '__essay' },
     { label: '──────────────────────', value: '', separator: true },
+    { label: 'View University', value: '__view' },
     { label: 'Update University', value: '__update' },
     { label: 'Delete University', value: '__delete' },
     { label: 'Back', value: '__back' },
   ];
   const val = await showMenu(items, 'University', ctx(nav), error);
 
-  if (val === '__back') return screenStudentContext({ ...nav, universitySlug: undefined });
+  if (val === '__back' || val === '__esc') return screenStudentContext({ ...nav, universitySlug: undefined });
+  if (val === '__view') {
+    try {
+      const { markdownPath } = await showUniversityProfile(nav.studentSlug!, nav.universitySlug!);
+      return screenPdfPrompt(nav, markdownPath, 'university');
+    } catch (err) {
+      return screenUniversityContext(nav, err instanceof Error ? err.message : String(err));
+    }
+  }
   if (val === '__update') return screenDomainPrompt(nav, 'update');
   if (val === '__delete') return screenDeleteUniversity(nav);
   if (val === '__guidance') return screenGuidanceList(nav);
@@ -240,10 +271,17 @@ async function screenDomainPrompt(nav: Nav, purpose: 'build' | 'update'): Promis
     return screenStudentContext(nav, 'Gemini API key not configured. Go to Config to set it.');
   }
   const domain = await waitForText('Enter university domain (e.g. mit.edu):', '', subtitle, ctx(nav));
-  if (!domain.trim()) return screenStudentContext(nav);
+  // [C01-F09] Esc on waitForText resolves '' — treat as cancel
+  if (!domain.trim()) return purpose === 'update' ? screenUniversityContext(nav) : screenStudentContext(nav);
   try {
     const uniSlug = purpose === 'update' ? nav.universitySlug : undefined;
-    const result = await buildUniversityProfile(domain.trim(), nav.studentSlug!, uniSlug);
+    // [C01-F11] Spinner while Playwright + Gemini scrape/extract
+    const result = await withSpinner(
+      buildUniversityProfile(domain.trim(), nav.studentSlug!, uniSlug),
+      'Scraping and analysing university — this may take a minute…',
+      subtitle,
+      ctx(nav),
+    );
     return screenUniversityContext({ ...nav, universitySlug: result.uniSlug });
   } catch (err) {
     return screenStudentContext(nav, err instanceof Error ? err.message : String(err));
@@ -260,20 +298,26 @@ async function screenGuidanceList(nav: Nav, error?: string): Promise<Nav> {
   ];
   const val = await showMenu(items, 'Guidance', ctx(nav), error);
 
-  if (val === '__back') return screenUniversityContext(nav);
+  if (val === '__back' || val === '__esc') return screenUniversityContext(nav);
   if (!getApiKey()) return screenUniversityContext(nav, 'Gemini API key not configured. Go to Config to set it.');
 
   try {
     let markdownPath: string;
     if (val === '__new') {
       const timestamp = makeTimestamp();
-      const result = await buildGuidance(nav.studentSlug!, nav.universitySlug!, timestamp);
+      // [C01-F11] Spinner while Gemini generates guidance report
+      const result = await withSpinner(
+        buildGuidance(nav.studentSlug!, nav.universitySlug!, timestamp),
+        'Generating guidance report — this may take a minute…',
+        'Guidance',
+        ctx(nav),
+      );
       markdownPath = result.reportPath;
     } else {
       const result = await showGuidance(nav.studentSlug!, nav.universitySlug!, val);
       markdownPath = result.markdownPath;
     }
-    return screenPdfPrompt(nav, markdownPath);
+    return screenPdfPrompt(nav, markdownPath, 'university');
   } catch (err) {
     return screenUniversityContext(nav, err instanceof Error ? err.message : String(err));
   }
@@ -289,26 +333,33 @@ async function screenEssayList(nav: Nav, error?: string): Promise<Nav> {
   ];
   const val = await showMenu(items, 'Essays', ctx(nav), error);
 
-  if (val === '__back') return screenUniversityContext(nav);
+  if (val === '__back' || val === '__esc') return screenUniversityContext(nav);
   if (!getApiKey()) return screenUniversityContext(nav, 'Gemini API key not configured. Go to Config to set it.');
 
   try {
     let markdownPath: string;
     if (val === '__new') {
       const timestamp = makeTimestamp();
-      const result = await buildEssay(nav.studentSlug!, nav.universitySlug!, timestamp);
+      // [C01-F11] Spinner while Gemini generates essay guidance
+      const result = await withSpinner(
+        buildEssay(nav.studentSlug!, nav.universitySlug!, timestamp),
+        'Generating essay guidance — this may take a minute…',
+        'Essay',
+        ctx(nav),
+      );
       markdownPath = result.essayPath;
     } else {
       const result = await showEssay(nav.studentSlug!, nav.universitySlug!, val);
       markdownPath = result.markdownPath;
     }
-    return screenPdfPrompt(nav, markdownPath);
+    return screenPdfPrompt(nav, markdownPath, 'university');
   } catch (err) {
     return screenUniversityContext(nav, err instanceof Error ? err.message : String(err));
   }
 }
 
-async function screenPdfPrompt(nav: Nav, markdownPath: string): Promise<Nav> {
+// [C01-F08] PDF prompt — returnTo controls where Back/Esc lands
+async function screenPdfPrompt(nav: Nav, markdownPath: string, returnTo: 'student' | 'university'): Promise<Nav> {
   const items = [
     { label: 'Yes — Export to PDF', value: 'yes' },
     { label: 'No — Return to menu', value: 'no' },
@@ -322,7 +373,7 @@ async function screenPdfPrompt(nav: Nav, markdownPath: string): Promise<Nav> {
       process.stderr.write(`PDF export failed: ${err instanceof Error ? err.message : String(err)}\n`);
     }
   }
-  return screenUniversityContext(nav);
+  return returnTo === 'student' ? screenStudentContext(nav) : screenUniversityContext(nav);
 }
 
 // ─── Entry point ──────────────────────────────────────────────────────────────

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { render, Box, Text, useInput, useApp } from 'ink';
 import { TextInput } from '@inkjs/ui';
 
@@ -28,9 +28,10 @@ interface AppScreenProps {
   hint?: string;
   children: React.ReactNode;
   footerHint?: string;
+  footerEsc?: string;
 }
 
-export function AppScreen({ subtitle, contextLine, hint, children, footerHint }: AppScreenProps) {
+export function AppScreen({ subtitle, contextLine, hint, children, footerHint, footerEsc }: AppScreenProps) {
   const cols = Math.min(process.stdout.columns ?? 80, 100);
   const bar = '▓▒░' + '─'.repeat(Math.max(0, cols - 10)) + '░▒▓';
 
@@ -76,8 +77,8 @@ export function AppScreen({ subtitle, contextLine, hint, children, footerHint }:
         <Text color="white"> navigate  </Text>
         <Text color="magenta">[ ↵ ] </Text>
         <Text color="white"> {footerHint ?? 'select'}  </Text>
-        <Text color="magenta">[ esc ] </Text>
-        <Text color="white"> back</Text>
+        <Text color="magenta">[ {footerEsc ?? 'esc'} ] </Text>
+        <Text color="white"> {footerEsc ? 'exit' : 'back'}</Text>
       </Box>
 
     </Box>
@@ -87,7 +88,7 @@ export function AppScreen({ subtitle, contextLine, hint, children, footerHint }:
 // ─── Custom spacious select ───────────────────────────────────────────────────
 
 // Separator items render as a full-width dimmed rule; navigation skips them.
-export function SpaciousSelect({ items, onSelect }: { items: SelectItem[]; onSelect: (val: string) => void }) {
+export function SpaciousSelect({ items, onSelect, onEscape }: { items: SelectItem[]; onSelect: (val: string) => void; onEscape?: () => void }) {
   const navigable = items.filter(i => !i.separator);
   const [cursor, setCursor] = useState(0);
   const cols = Math.min(process.stdout.columns ?? 80, 100);
@@ -99,6 +100,7 @@ export function SpaciousSelect({ items, onSelect }: { items: SelectItem[]; onSel
       const selected = navigable[cursor];
       if (selected) onSelect(selected.value);
     }
+    if (key.escape && onEscape) onEscape();
   });
 
   let navIdx = -1;
@@ -157,6 +159,9 @@ export function waitForSelect(
             onSelect={val => {
               if (!resolved) { resolved = true; exit(); resolve(val); }
             }}
+            onEscape={() => {
+              if (!resolved) { resolved = true; exit(); resolve('__esc'); }
+            }}
           />
         </AppScreen>
       );
@@ -178,6 +183,7 @@ export function waitForText(
       const { exit } = useApp();
       useInput((_input, key) => {
         if (key.return) { exit(); resolve(value); }
+        if (key.escape) { exit(); resolve(''); }
       });
       return (
         <AppScreen subtitle={subtitle} contextLine={contextLine} hint={hint} footerHint="confirm">
@@ -215,4 +221,46 @@ export function waitForConfirm(
     subtitle,
     contextLine,
   ).then(v => v === 'yes');
+}
+
+// [C01-F11] Spinner overlay — renders while a long-running promise is in flight
+const SPINNER_FRAMES = ['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏'];
+
+export function withSpinner<T>(
+  promise: Promise<T>,
+  message: string,
+  subtitle: string,
+  contextLine?: string,
+): Promise<T> {
+  return new Promise((resolve, reject) => {
+    let done = false;
+
+    function SpinnerScreen() {
+      const [frame, setFrame] = useState(0);
+      const { exit } = useApp();
+
+      useEffect(() => {
+        const interval = setInterval(() => setFrame(f => (f + 1) % SPINNER_FRAMES.length), 80);
+        return () => clearInterval(interval);
+      }, []);
+
+      useEffect(() => {
+        promise.then(
+          val => { if (!done) { done = true; exit(); resolve(val); } },
+          err => { if (!done) { done = true; exit(); reject(err as Error); } },
+        );
+      }, []); // promise ref is stable for the lifetime of this render
+
+      return (
+        <AppScreen subtitle={subtitle} contextLine={contextLine}>
+          <Box paddingLeft={4} paddingTop={2}>
+            <Text bold color="magenta">{SPINNER_FRAMES[frame]} </Text>
+            <Text color="white">{message}</Text>
+          </Box>
+        </AppScreen>
+      );
+    }
+
+    render(<SpinnerScreen />);
+  });
 }
