@@ -3,7 +3,7 @@ import React, { useState } from 'react';
 import { render, Box, Text } from 'ink';
 import { promises as fs } from 'fs';
 
-import { bootstrap, workspacePath, getApiKey, getModel, saveConfig, ConfigValidationError } from '../../config/bootstrap.js';
+import { bootstrap, workspacePath, getApiKey, getModel, getTokenWindow, getContentBudgetPct, saveConfig, ConfigValidationError } from '../../config/bootstrap.js';
 import { buildStudentProfile, deleteStudentProfile } from '../c02-student-profile/index.js';
 import { buildUniversityProfile, deleteUniversityProfile } from '../c03-university-profile/index.js';
 import { buildGuidance, showGuidance, listGuidance } from '../c04-guidance-engine/index.js';
@@ -120,9 +120,13 @@ async function screenStudentSelect(nav: Nav, error?: string): Promise<Nav> {
 async function screenConfig(nav: Nav, error?: string): Promise<Nav> {
   const maskedKey = maskApiKey(getApiKey());
   const currentModel = getModel() ?? '(not set)';
+  const currentTokenWindow = getTokenWindow();
+  const currentContentBudgetPct = getContentBudgetPct();
   const items = [
-    { label: `Edit API Key   ${maskedKey}`, value: '__edit-key' },
-    { label: `Edit Model     ${currentModel}`, value: '__edit-model' },
+    { label: `Edit API Key          ${maskedKey}`, value: '__edit-key' },
+    { label: `Edit Model            ${currentModel}`, value: '__edit-model' },
+    { label: `Edit Token Window     ${currentTokenWindow}`, value: '__edit-token-window' },
+    { label: `Edit Content Budget % ${currentContentBudgetPct}`, value: '__edit-content-budget' },
     { label: '──────────────────────', value: '', separator: true },
     { label: 'Save & Return', value: '__save' },
     { label: 'Cancel', value: '__back' },
@@ -132,11 +136,6 @@ async function screenConfig(nav: Nav, error?: string): Promise<Nav> {
   if (val === '__back') return screenStudentSelect(nav);
   if (val === '__edit-key') {
     const newKey = await waitForText('Gemini API Key:', getApiKey() ?? '', 'Config › Edit API Key');
-    try {
-      await saveConfig(newKey.trim(), getModel() ?? '');
-    } catch (err) {
-      // Partial save — will be caught at __save time; just update in-memory for display
-    }
     process.env.GEMINI_API_KEY = newKey.trim();
     return screenConfig(nav);
   }
@@ -145,9 +144,19 @@ async function screenConfig(nav: Nav, error?: string): Promise<Nav> {
     process.env.GEMINI_MODEL = newModel.trim();
     return screenConfig(nav);
   }
+  if (val === '__edit-token-window') {
+    const raw = await waitForText('Token Window (tokens):', String(getTokenWindow()), 'Config › Edit Token Window');
+    process.env.GEMINI_TOKEN_WINDOW = raw.trim();
+    return screenConfig(nav);
+  }
+  if (val === '__edit-content-budget') {
+    const raw = await waitForText('Content Budget % (1–100):', String(getContentBudgetPct()), 'Config › Edit Content Budget %');
+    process.env.GEMINI_CONTENT_BUDGET_PCT = raw.trim();
+    return screenConfig(nav);
+  }
   if (val === '__save') {
     try {
-      await saveConfig(getApiKey() ?? '', getModel() ?? '');
+      await saveConfig(getApiKey() ?? '', getModel() ?? '', getTokenWindow(), getContentBudgetPct());
       return screenStudentSelect(nav);
     } catch (err) {
       const msg = err instanceof ConfigValidationError ? err.message : String(err);

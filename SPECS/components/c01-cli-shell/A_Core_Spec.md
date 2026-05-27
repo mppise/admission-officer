@@ -14,7 +14,7 @@ Entry point for `ao`. Calls the C07 bootstrap, then renders a full-screen ink me
 | :----- | :- | :---------- | :------- | :------ | :-------- |
 | `Not Started` | C01-F01 | On startup: call C07 `bootstrap()`, then render the Student Select screen | P1 | REQ-0014, REQ-0015 | - |
 | `Not Started` | C01-F02 | Student Select screen: list existing student slugs from `university-ao/students/` + "New Student" + "Config" options | P1 | REQ-0015, REQ-0016, REQ-0017 | - |
-| `Not Started` | C01-F03 | Config screen: display current `GEMINI_API_KEY` (masked) and `GEMINI_MODEL`; allow editing both; call `C07.saveConfig()` on confirm; return to Student Select | P1 | REQ-0020 | - |
+| `Not Started` | C01-F03 | Config screen: display current `GEMINI_API_KEY` (masked), `GEMINI_MODEL`, `GEMINI_TOKEN_WINDOW`, and `GEMINI_CONTENT_BUDGET_PCT`; allow editing all four; call `C07.saveConfig(key, model, tokenWindow, contentBudgetPct)` on confirm; return to Student Select | P1 | REQ-0020 | - |
 | `Not Started` | C01-F04 | Student Context screen: after a student is selected, show "Update Profile", "Delete Profile", university list + "New University"; hold selected student slug in navigation state | P1 | REQ-0015, REQ-0017, REQ-0018 | - |
 | `Not Started` | C01-F05 | University Context screen: after a university is selected, show "Update University", "Delete University", "Guidance", "Essay"; hold selected university slug in navigation state | P1 | REQ-0004, REQ-0015, REQ-0018, REQ-0019 | - |
 | `Not Started` | C01-F06 | Guidance flow: show dated guidance list + "New Guidance"; on "New" dispatch to C04; on existing entry display it; offer PDF prompt; return to University Context | P1 | REQ-0015, REQ-0019 | - |
@@ -92,7 +92,7 @@ All screens use the shared `tui.tsx` helpers (`AppScreen`, `SpaciousSelect`, `wa
 `read university-ao/students/ directory → list slugs → render [slugs... | "New Student" | "Config"] → user selects → dispatch`
 
 **F03 — Config:**
-`read getApiKey() + getModel() → render masked key + model → user edits → await C07.saveConfig(key, model) → render success → return to Student Select`
+`read getApiKey() + getModel() + getTokenWindow() + getContentBudgetPct() → render masked key + model + tokenWindow + contentBudgetPct → user edits all four → await C07.saveConfig(key, model, tokenWindow, contentBudgetPct) → render success → return to Student Select`
 
 **F04 — Student Context:**
 `studentSlug set → read university-ao/students/<slug>/universities/ → list university slugs → render [slugs... | "New University" | "Update Profile" | "Delete Profile" | "Back"] → dispatch`

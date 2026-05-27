@@ -7,9 +7,9 @@ license: Apache-2.0 (see LICENSE in project root)
 
 # Project Status
 
-> **Overall health:** ✅ v2.0.0 ready to deploy
+> **Overall health:** ✅ v2.0.1 ready to deploy
 > **Last updated:** 2026-05-27
-> **Active phase:** Deployment Readiness ✅ (CHG-002)
+> **Active phase:** Deployment Readiness ✅ (v2.0.1 patch)
 
 ---
 
@@ -30,6 +30,9 @@ license: Apache-2.0 (see LICENSE in project root)
 | Detailed Design (CHG-002) | ✅ | 2026-05-27 | 2026-05-27 | SpecGantry | All 7 components (C01–C07) specified for CHG-002. New C07 Bootstrap added. All 21 requirements fully covered in traceability index. |
 | Development (CHG-002) | ✅ | 2026-05-27 | 2026-05-27 | SpecGantry | All 7 components implemented; tsc + build clean. commander/enquirer removed. src/cli/ deleted. v2.0.0. |
 | Deployment Readiness (CHG-002) | ✅ | 2026-05-27 | 2026-05-27 | SpecGantry | Audit `rel_2026.05.27.0710` PASS (0 SEV-1, 0 SEV-2, 6 SEV-3 carry-forwards). `go.sh` updated — entry point changed to `dist/components/c01-cli-shell/index.js`. Ready to publish. |
+| Detailed Design (bug fix v2.0.1) | ✅ | 2026-05-27 | 2026-05-27 | SpecGantry | C07-F03/F04 extended to include `GEMINI_TOKEN_WINDOW` + `GEMINI_CONTENT_BUDGET_PCT`; C01-F03 Config screen extended to display/edit all 4 env vars. |
+| Development (bug fix v2.0.1) | ✅ | 2026-05-27 | 2026-05-27 | SpecGantry | `bootstrap.ts`: added `getTokenWindow()`, `getContentBudgetPct()`, extended `saveConfig()` to 4 params. `C01 screenConfig`: 2 new edit items + updated save call. C03 + env.ts default aligned to 1048576. tsc clean. |
+| Deployment Readiness (v2.0.1) | ✅ | 2026-05-27 | 2026-05-27 | SpecGantry | Audit `rel_2026.05.27.0726` PASS (0 SEV-1, 0 SEV-2, 7 SEV-3 carry-forwards). `go.sh` unchanged — reads v2.0.1 from `package.json` automatically. Ready to publish. |
 
 > **Status key:** ⬜ Not started · 🔄 In progress · ✅ Complete · 🔴 Blocked
 
@@ -39,8 +42,8 @@ license: Apache-2.0 (see LICENSE in project root)
 
 | **Component** | **Status** | **Design started** | **Design ready** | **Dev started** | **Dev complete** | **Blocked by** | **Notes** |
 | :------------ | :--------: | :----------------: | :--------------: | :-------------: | :--------------: | :------------- | :-------- |
-| C07 Bootstrap | ✅ | 2026-05-27 | 2026-05-27 | 2026-05-27 | 2026-05-27 | | src/config/bootstrap.ts: bootstrap(), workspacePath(), getApiKey(), getModel(), saveConfig(), ConfigValidationError |
-| C01 CLI Shell | ✅ | 2026-05-27 | 2026-05-27 | 2026-05-27 | 2026-05-27 | | src/components/c01-cli-shell/index.tsx: full ink menu TUI; commander and old src/cli/ removed |
+| C07 Bootstrap | ✅ | 2026-05-27 | 2026-05-27 | 2026-05-27 | 2026-05-27 | | src/config/bootstrap.ts: bootstrap(), workspacePath(), getApiKey(), getModel(), getTokenWindow(), getContentBudgetPct(), saveConfig() (4 params), ConfigValidationError |
+| C01 CLI Shell | ✅ | 2026-05-27 | 2026-05-27 | 2026-05-27 | 2026-05-27 | | Config screen now displays/edits all 4 env vars: API key, model, token window, content budget % |
 | C02 Student Profile | ✅ | 2026-05-27 | 2026-05-27 | 2026-05-27 | 2026-05-27 | | Updated: workspacePath(), deleteStudentProfile(), buildStudentProfile returns {profilePath, studentSlug} |
 | C03 University Profile | ✅ | 2026-05-27 | 2026-05-27 | 2026-05-27 | 2026-05-27 | | Updated: workspacePath(), nested university paths, deleteUniversityProfile(), new buildUniversityProfile signature |
 | C04 Guidance Engine | ✅ | 2026-05-27 | 2026-05-27 | 2026-05-27 | 2026-05-27 | | Updated: timestamp param, dated dirs, listGuidance(), workspacePath() |
@@ -84,7 +87,8 @@ license: Apache-2.0 (see LICENSE in project root)
 | v1.2.0 | [-] Deprecated | 2026-05-25 | | Patch release — full-screen ink TUI for C02 + C05; shared `src/utils/tui.tsx`; "Back as separator" defect fixed. Audit `rel_2026.05.25.2149` PASS. Superseded by v1.3.0. |
 | v1.3.0 | [⏸] Paused | 2026-05-26 | | Minor release — C02 Shadowing (F06) + Research (F07) sections; TUI visual overhaul; contextual guidance copy. Audit `rel_2026.05.26.0911` PASS, but a runtime crash on legacy profile.json was reported post-audit. Deployment paused pending v1.3.1 patch. |
 | v1.3.1 | [X] Active (Ready to Deploy) | 2026-05-26 | | Patch release — C02 resume-crash fix (generic-merge defaulting on profile.json load) + shared `tui.tsx` visual contrast fix (drop `dimColor` on hint/footer/inactive rows; invert active row to white-on-black). Affects C02 and C05. Audit `rel_2026.05.26.0943` PASS. |
-| v2.0.0 | [X] Active (Ready to Deploy) | 2026-05-27 | | Major release (CHG-002) — full menu-driven ink TUI; `university-ao/` workspace; nested university paths; dated guidance/essay dirs; Config screen; Back navigation; Delete with confirmation. `commander` + `enquirer` removed. 7 components. Audit `rel_2026.05.27.0710` PASS. |
+| v2.0.0 | [-] Superseded | 2026-05-27 | | Major release (CHG-002) — full menu-driven ink TUI; `university-ao/` workspace; nested university paths; dated guidance/essay dirs; Config screen; Back navigation; Delete with confirmation. `commander` + `enquirer` removed. 7 components. Audit `rel_2026.05.27.0710` PASS. Superseded by v2.0.1. |
+| v2.0.1 | [X] Active (Ready to Deploy) | 2026-05-27 | | Patch release — Config screen extended to display/edit all 4 Gemini env vars (`GEMINI_API_KEY`, `GEMINI_MODEL`, `GEMINI_TOKEN_WINDOW`, `GEMINI_CONTENT_BUDGET_PCT`). `saveConfig()` writes all 4. Default token window aligned to 1048576 across C03 and env.ts. Audit `rel_2026.05.27.0726` PASS. |
 
 ---
 

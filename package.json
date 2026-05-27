@@ -1,6 +1,6 @@
 {
   "name": "university-admission-officer",
-  "version": "2.0.0",
+  "version": "2.0.1",
   "description": "Admissions Officer CLI — personalised college admissions guidance for high school students",
   "type": "module",
   "bin": {

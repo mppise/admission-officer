@@ -30,7 +30,7 @@ export function getGeminiModel(): string {
 // Remaining % covers prompt template, instructions, program bullets, and output JSON.
 // Conversion: 1 token ≈ 4 chars (conservative estimate for English prose).
 export function getGeminiBatchCharBudget(): number {
-  const tokenWindow = parseInt(process.env.GEMINI_TOKEN_WINDOW ?? '32000', 10);
+  const tokenWindow = parseInt(process.env.GEMINI_TOKEN_WINDOW ?? '1048576', 10);
   const contentPct = parseInt(process.env.GEMINI_CONTENT_BUDGET_PCT ?? '60', 10);
   return Math.floor(tokenWindow * (contentPct / 100) * 4);
 }

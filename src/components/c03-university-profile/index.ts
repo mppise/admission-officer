@@ -11,7 +11,7 @@ import { loadPrompt } from '../../ai/promptLoader.js';
 function getGeminiApiKey(): string { return getApiKey() ?? ''; }
 function getGeminiModel(): string { return getModel() ?? ''; }
 function getGeminiBatchCharBudget(): number {
-  const tokenWindow = parseInt(process.env.GEMINI_TOKEN_WINDOW ?? '32000', 10);
+  const tokenWindow = parseInt(process.env.GEMINI_TOKEN_WINDOW ?? '1048576', 10);
   const contentPct = parseInt(process.env.GEMINI_CONTENT_BUDGET_PCT ?? '60', 10);
   return Math.floor(tokenWindow * (contentPct / 100) * 4);
 }
