@@ -2,10 +2,19 @@ import { chromium } from 'playwright';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { promises as fs } from 'fs';
 import path from 'path';
-import { dataPath, writeFile, readFile, fileExists, ensureDir } from '../../utils/fileUtils.js';
+import { workspacePath, getApiKey, getModel } from '../../config/bootstrap.js';
+import { writeFile, readFile, fileExists, ensureDir } from '../../utils/fileUtils.js';
 import { toSlug } from '../../utils/slugUtils.js';
 import { loadPrompt } from '../../ai/promptLoader.js';
-import { getGeminiApiKey, getGeminiModel, getGeminiBatchCharBudget } from '../../config/env.js';
+
+// GEMINI_TOKEN_WINDOW / GEMINI_CONTENT_BUDGET_PCT still read from env for C03 batch sizing
+function getGeminiApiKey(): string { return getApiKey() ?? ''; }
+function getGeminiModel(): string { return getModel() ?? ''; }
+function getGeminiBatchCharBudget(): number {
+  const tokenWindow = parseInt(process.env.GEMINI_TOKEN_WINDOW ?? '32000', 10);
+  const contentPct = parseInt(process.env.GEMINI_CONTENT_BUDGET_PCT ?? '60', 10);
+  return Math.floor(tokenWindow * (contentPct / 100) * 4);
+}
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -569,7 +578,7 @@ function renderUniversityMarkdown(
 // ─── Read student intended majors ─────────────────────────────────────────────
 
 async function readIntendedMajors(studentSlug: string): Promise<string[]> {
-  const profilePath = dataPath(studentSlug, 'profile.md');
+  const profilePath = workspacePath('students', studentSlug, 'profile.md');
   const content = await readFile(profilePath);
   const match = content.match(/\|\s*Intended Majors \/ Tracks\s*\|\s*([^|\n]+)\|/);
   if (!match) return [];
@@ -582,17 +591,21 @@ async function readIntendedMajors(studentSlug: string): Promise<string[]> {
 // [C03-F01..F04] Build a university profile using two-pass extraction + synthesis
 export async function buildUniversityProfile(
   domain: string,
-  nameOverride: string | undefined,
   studentSlug: string,
-): Promise<{ profilePath: string }> {
-  const rawName = nameOverride ?? domain.replace(/\.[^.]+$/, '');
+  uniSlug?: string,
+): Promise<{ profilePath: string; uniSlug: string }> {
+  const apiKey = getApiKey();
+  const modelName = getModel();
+  if (!apiKey || !modelName) throw new Error('Gemini API key or model not configured. Go to Config to set them.');
+
+  const rawName = uniSlug ?? domain.replace(/\.[^.]+$/, '');
   const slug = toSlug(rawName);
 
   const intendedMajors = await readIntendedMajors(studentSlug);
   const intendedMajorsLabel = intendedMajors.length > 0 ? intendedMajors.join(', ') : 'Undecided';
 
-  const profilePath = dataPath(studentSlug, slug, 'profile.md');
-  const jsonPath = dataPath(studentSlug, slug, 'profile.json');
+  const profilePath = workspacePath('students', studentSlug, 'universities', slug, 'profile.md');
+  const jsonFilePath = workspacePath('students', studentSlug, 'universities', slug, 'profile.json');
 
   // Read existing profile.md for merge in Pass 2
   const existingProfile = (await fileExists(profilePath)) ? await readFile(profilePath) : '';
@@ -613,15 +626,12 @@ export async function buildUniversityProfile(
 
   // Load or initialise profile.json once — passed to crawlAndExtract to avoid double load
   let profileData: ProfileJson;
-  if (await fileExists(jsonPath)) {
-    profileData = await loadProfileJson(jsonPath, intendedMajors);
+  if (await fileExists(jsonFilePath)) {
+    profileData = await loadProfileJson(jsonFilePath, intendedMajors);
     const doneCount = profileData.pages.filter(p => p.status === 'done').length;
     const scrapedCount = profileData.pages.filter(p => p.status === 'scraped').length;
     console.log(`Resuming: ${doneCount} pages extracted, ${scrapedCount} scraped but pending extraction.`);
 
-    // Detect newly-added program categories: if a Program: category is empty and there are
-    // already-processed pages, those pages were never asked about this major. Reset all pages
-    // and clear all facts so re-extraction starts clean without duplicates.
     const newProgramCats = intendedMajors
       .map(programCategory)
       .filter(cat => (profileData[cat] as string[]).length === 0 && doneCount > 0);
@@ -632,7 +642,7 @@ export async function buildUniversityProfile(
       for (const cat of allCategories(intendedMajors)) {
         (profileData[cat] as string[]) = [];
       }
-      await saveProfileJson(jsonPath, profileData);
+      await saveProfileJson(jsonFilePath, profileData);
     }
   } else {
     profileData = emptyProfileJson(intendedMajors);
@@ -643,7 +653,7 @@ export async function buildUniversityProfile(
 
   // Pass 1 — BFS crawl + per-page Gemini extraction → profile.json
   console.log(`Crawling ${domain} (up to ${MAX_CRAWL_PAGES} pages)...`);
-  const crawledData = await crawlAndExtract(domain, jsonPath, profileData, intendedMajors, stats);
+  const crawledData = await crawlAndExtract(domain, jsonFilePath, profileData, intendedMajors, stats);
   console.log(`  Pass 1 complete: ${crawledData.pages.length} pages processed.`);
 
   // Report category coverage
@@ -661,7 +671,7 @@ export async function buildUniversityProfile(
   await writeFile(profilePath, markdown);
 
   // Run statistics summary
-  const modelName = getGeminiModel();
+  const modelUsed = getGeminiModel();
   console.log('\n── Run Statistics ────────────────────────────────────');
   console.log(`  URLs scanned:    ${stats.urlsScanned}`);
   console.log(`  URLs failed:     ${stats.urlsFailed}`);
@@ -669,19 +679,25 @@ export async function buildUniversityProfile(
   console.log(`  LLM calls:       ${stats.llmCalls}`);
   console.log(`  Input tokens:    ${stats.totalInputTokens.toLocaleString()}`);
   console.log(`  Output tokens:   ${stats.totalOutputTokens.toLocaleString()}`);
-  console.log(`  Estimated cost:  ${estimateCost(modelName, stats.totalInputTokens, stats.totalOutputTokens)} (${modelName})`);
+  console.log(`  Estimated cost:  ${estimateCost(modelUsed, stats.totalInputTokens, stats.totalOutputTokens)} (${modelUsed})`);
   console.log('──────────────────────────────────────────────────────');
 
-  return { profilePath };
+  return { profilePath, uniSlug: slug };
 }
 
 // [C03-F05] Show stored university profile
-export async function showUniversityProfile(studentSlug: string, nameSlug: string): Promise<{ markdownPath: string }> {
-  const markdownPath = dataPath(studentSlug, nameSlug, 'profile.md');
+export async function showUniversityProfile(studentSlug: string, uniSlug: string): Promise<{ markdownPath: string }> {
+  const markdownPath = workspacePath('students', studentSlug, 'universities', uniSlug, 'profile.md');
   if (!(await fileExists(markdownPath))) {
-    throw new Error(`No university profile found for "${nameSlug}" under student "${studentSlug}". Run: ao --university-profile --build --domain <domain> --student ${studentSlug}`);
+    throw new Error(`No university profile found for "${uniSlug}". Build a university profile first.`);
   }
   const content = await readFile(markdownPath);
-  console.log(content);
+  process.stdout.write(content + '\n');
   return { markdownPath };
+}
+
+// [C03-F06] Delete university directory
+export async function deleteUniversityProfile(studentSlug: string, uniSlug: string): Promise<void> {
+  const dir = workspacePath('students', studentSlug, 'universities', uniSlug);
+  await fs.rm(dir, { recursive: true, force: true });
 }

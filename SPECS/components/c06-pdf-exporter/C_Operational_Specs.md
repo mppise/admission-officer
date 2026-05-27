@@ -1,5 +1,7 @@
 # C06 — PDF Exporter: Operational Specifications
 
+> ⚠️ Revised 2026-05-27 (CHG-002): Invocation updated from `--print` flag to follow-up "Export to PDF?" menu prompt. Fatal/non-fatal distinction updated accordingly.
+
 ## Error Handling
 
 | Feature | Error Class | Retries | Backoff | Fallback |
@@ -18,22 +20,22 @@ Fallback message always includes the markdown path so the user can access the co
 ### C06-F02 — Export Flow
 
 ```
-1. C01 invokes exportToPdf(markdownPath) after primary command succeeds
-2. Print: "Exporting to PDF..."
-3. On success: print "PDF exported: <pdfPath>"
-4. On failure: print fallback message to stderr; do not exit if primary command already succeeded
-   — PDF failure is non-fatal when --show was the primary command
-   — PDF failure is fatal when --build was the primary command (since user explicitly requested print output)
+1. C01 shows follow-up "Export to PDF?" prompt (waitForConfirm) after any markdown is printed to stdout
+2. If user selects Yes: C01 invokes exportToPdf(markdownPath)
+3. Print: "Exporting to PDF..."
+4. On success: print "PDF exported: <pdfPath>"
+5. On failure: print fallback message to stderr; always non-fatal (user already saw the markdown)
 ```
 
 ### Fatal vs Non-Fatal PDF Failure
 
-| Primary command | PDF failure behaviour |
-| :-------------- | :-------------------- |
-| `--build --print` | Fatal — exit(1) after error message |
-| `--show --print` | Non-fatal — print warning to stderr; primary output already shown to stdout |
+PDF export is always invoked **after** the user has already seen the markdown output (via the follow-up prompt flow). Therefore all PDF failures are **non-fatal** — the primary content has already been delivered.
 
-C01 controls this distinction by catching the error from `exportToPdf` and deciding exit behaviour based on which command was active.
+| Context | PDF failure behaviour |
+| :------ | :-------------------- |
+| Any "Export to PDF?" follow-up | Non-fatal — print warning to stderr; return to menu |
+
+C01 catches errors from `exportToPdf` and returns to the menu after showing the error message.
 
 ---
 
@@ -106,5 +108,5 @@ Not applicable.
 
 | Bottleneck | Mitigation | Owner |
 | :--------- | :--------- | :---- |
-| Puppeteer cold start (~1–3s per invocation) | Acceptable for single `--print` call per command; no mitigation needed | — |
+| Puppeteer cold start (~1–3s per invocation) | Acceptable for single export call per action; no mitigation needed | — |
 | Large markdown files (e.g., verbose guidance report) rendering slowly | `page.pdf()` is synchronous from our perspective; typical `ao` files well within 1s render time | — |

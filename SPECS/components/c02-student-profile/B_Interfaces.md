@@ -1,28 +1,37 @@
 # C02 — Student Profile: Interfaces
 
+> ⚠️ Revised 2026-05-27 (CHG-002): Function signatures updated; `deleteStudentProfile` added; all data paths updated from `data/students/` to `university-ao/students/` via `C07.workspacePath()`.
+
 ## Exposed Functions (called by C01)
 
 ```typescript
-buildStudentProfile(name?: string): Promise<{ profilePath: string }>
+buildStudentProfile(studentSlug?: string): Promise<{ profilePath: string; studentSlug: string }>
 ```
-- If `name` is undefined, prompts for it as the first input before opening the menu.
-- If `profile.json` exists at the resolved path, loads it and resumes the menu with existing values and field statuses.
-- Returns the absolute path to the saved `profile.md` (written on Finalize & Save).
+- If `studentSlug` is undefined, prompts for name as the first input, generates slug, then opens the menu.
+- If `profile.json` exists at the resolved path, loads it (merged over `emptyProfile()`) and resumes the menu.
+- Returns the absolute path to saved `profile.md` and the resolved slug.
 
 ```typescript
-showStudentProfile(name: string): Promise<{ markdownPath: string }>
+showStudentProfile(studentSlug: string): Promise<{ markdownPath: string }>
 ```
-- Reads and prints `data/students/<slug>/profile.md` to stdout.
-- Returns the absolute path to the markdown file (for C06 `--print` composition).
+- Reads and prints `university-ao/students/<slug>/profile.md` to stdout.
+- Returns the absolute path (for C06 PDF export).
 - Throws with actionable message if file does not exist.
+
+```typescript
+deleteStudentProfile(studentSlug: string): Promise<void>
+```
+- Removes `university-ao/students/<slug>/` recursively.
+- Called by C01 **after** delete confirmation — C02 does not confirm.
+- Throws on filesystem error; C01 handles display.
 
 ---
 
 ## JSON Sidecar Schema
 
-**Path:** `data/students/<slug>/profile.json`
+**Path:** `university-ao/students/<slug>/profile.json`
 **Encoding:** UTF-8
-**Role:** Canonical source of truth. Written after every individual field input. Read on every session start. Includes field-level completion statuses alongside values.
+**Role:** Canonical source of truth. Written after every individual field input.
 
 ```json
 {
@@ -100,7 +109,7 @@ showStudentProfile(name: string): Promise<{ markdownPath: string }>
 
 ## Markdown File Schema
 
-**Path:** `data/students/<slug>/profile.md`
+**Path:** `university-ao/students/<slug>/profile.md`
 **Encoding:** UTF-8
 **Role:** Human-readable display and AI prompt input. Written exactly once per session on Finalize & Save. Never parsed back to structured data.
 

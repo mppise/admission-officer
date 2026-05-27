@@ -1,94 +1,125 @@
 # C01 — CLI Shell: Interfaces
 
-## Exposed Interface
+> ⚠️ Revised 2026-05-27 (CHG-002): All CLI flag interfaces removed. C01 now exposes no programmatic API. Internal function contracts updated for new signatures required by menu dispatch.
 
-C01 is the sole public interface of `ao`. It exposes no programmatic API — all interaction is via the CLI.
-
-### Entry Point
+## Entry Point
 
 ```
 bin: ao
-File: src/cli/index.ts
-Invocation: npx ao <flags>  |  ao <flags>
+File: src/components/c01-cli-shell/index.tsx
+Invocation: ao  (no arguments)
 ```
+
+C01 is the sole entry point. No flags. No subcommands.
 
 ---
 
 ## Internal Function Contracts
 
-C01 dispatches to component handlers via direct TypeScript async function calls. Each handler signature is defined here as the contract between C01 and the component it calls.
+C01 dispatches to component handlers via direct TypeScript async function calls. Updated signatures for CHG-002:
 
-### Student Profile
+### Student Profile (C02)
 
 ```typescript
-// C02
-buildStudentProfile(name?: string): Promise<{ profilePath: string }>
-showStudentProfile(name: string): Promise<{ markdownPath: string }>
+// Build new or update existing
+buildStudentProfile(studentSlug?: string): Promise<{ profilePath: string; studentSlug: string }>
+
+// Display stored profile — returns path for PDF prompt
+showStudentProfile(studentSlug: string): Promise<{ markdownPath: string }>
+
+// Delete student directory
+deleteStudentProfile(studentSlug: string): Promise<void>
 ```
 
-### University Profile
+### University Profile (C03)
 
 ```typescript
-// C03
-buildUniversityProfile(domain: string, name?: string): Promise<{ profilePath: string }>
-showUniversityProfile(name: string): Promise<{ markdownPath: string }>
+// Build new or update existing
+buildUniversityProfile(domain: string, studentSlug: string, uniSlug?: string): Promise<{ profilePath: string; uniSlug: string }>
+
+// Display stored profile
+showUniversityProfile(studentSlug: string, uniSlug: string): Promise<{ markdownPath: string }>
+
+// Delete university directory
+deleteUniversityProfile(studentSlug: string, uniSlug: string): Promise<void>
 ```
 
-### Guidance Engine
+### Guidance Engine (C04)
 
 ```typescript
-// C04
-buildGuidance(studentName: string, universityName: string): Promise<{ reportPath: string }>
-showGuidance(studentName: string, universityName: string): Promise<{ markdownPath: string }>
+// Generate new guidance — saves to dated dir
+buildGuidance(studentSlug: string, uniSlug: string): Promise<{ reportPath: string; timestamp: string }>
+
+// Display a specific dated guidance
+showGuidance(studentSlug: string, uniSlug: string, timestamp: string): Promise<{ markdownPath: string }>
+
+// List available dated guidance dirs
+listGuidance(studentSlug: string, uniSlug: string): Promise<string[]>
 ```
 
-### Essay Advisor
+### Essay Advisor (C05)
 
 ```typescript
-// C05
-buildEssay(studentName: string, universityName: string): Promise<{ essayPath: string }>
-showEssay(studentName: string, universityName: string): Promise<{ markdownPath: string }>
+// Generate new essay — saves to dated dir
+buildEssay(studentSlug: string, uniSlug: string): Promise<{ essayPath: string; timestamp: string }>
+
+// Display a specific dated essay
+showEssay(studentSlug: string, uniSlug: string, timestamp: string): Promise<{ markdownPath: string }>
+
+// List available dated essay dirs
+listEssays(studentSlug: string, uniSlug: string): Promise<string[]>
 ```
 
-### PDF Exporter
+### PDF Exporter (C06)
 
 ```typescript
-// C06
 exportToPdf(markdownPath: string): Promise<{ pdfPath: string }>
 ```
+
+### Bootstrap (C07)
+
+```typescript
+bootstrap(): Promise<void>
+getApiKey(): string | undefined
+getModel(): string | undefined
+saveConfig(key: string, model: string): Promise<void>
+workspacePath(...segments: string[]): string
+```
+
+---
+
+## Directory Listing Contracts
+
+C01 reads directories to populate select lists. Expected filesystem layout:
+
+```
+university-ao/students/                           → list student slugs (C01-F02)
+university-ao/students/<s>/universities/          → list university slugs (C01-F04)
+university-ao/students/<s>/universities/<u>/guidance/   → list dated dirs (C01-F06)
+university-ao/students/<s>/universities/<u>/essays/     → list dated dirs (C01-F07)
+```
+
+Empty directories return an empty array — C01 renders only the "New" option in that case.
 
 ---
 
 ## Stdout / Stderr Contract
 
-All component handlers must return a resolved markdown path so C01 can:
-1. Print a success message: `Saved: <path>`
-2. Pass the path to C06 if `--print` is set
-
-### Standard Output Messages
+C01 renders all output via ink to the terminal. No raw `console.log` for interactive content. Exceptions:
 
 | Event | Channel | Format |
 | :---- | :------ | :----- |
-| Operation in progress | stdout | `<Verb>ing <subject>...` e.g. `Building student profile...` |
-| Save success | stdout | `Saved: data/students/john-doe/profile.md` |
-| Show success | stdout | *(markdown content printed directly)* |
-| PDF exported | stdout | `PDF exported: data/students/john-doe/profile.pdf` |
-| Retry notice | stdout | `Retrying in 30 seconds... (attempt 2 of 2)` |
-| Missing prerequisite | stderr | `No student profile found for "<name>". Run: ao --student-profile --build --name <name>` |
-| Missing intended major | stderr | `Student profile for "<name>" has no intended major. Run: ao --student-profile --build --name <name> to update.` |
-| Missing .env key | stderr | `Missing required config: GEMINI_API_KEY. Add it to your .env file.` |
-| Unknown flag | stderr | *(commander default help output)* |
-| Unhandled error | stderr | `Something went wrong: <plain-English message>. No stack trace.` |
+| Bootstrap warning | stderr | `[ao] Warning: <message>` |
+| PDF saved | ink screen | `PDF saved: <path>` |
+| Delete complete | ink screen | `Deleted.` then navigate back |
+| Save success | ink screen | `Saved: <path>` |
+| Unhandled error | stderr | `Something went wrong: <plain-English message>` then exit(1) |
 
 ---
 
-## Events
-
-C01 produces and consumes no events. All communication is via direct function calls and process exit codes.
-
-### Exit Codes
+## Exit Codes
 
 | Code | Meaning |
 | :--- | :------ |
-| `0` | Success |
-| `1` | Any error (prerequisite failure, missing config, component error) |
+| `0` | User exited menu cleanly |
+| `1` | Unhandled error during any operation |

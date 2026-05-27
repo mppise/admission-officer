@@ -13,11 +13,12 @@
 
 ## Key Facts for Developers
 - C06 is **the simplest component** — one function, one pipeline: markdown → HTML → PDF.
+- C06 is **invoked via a follow-up "Export to PDF?" prompt** shown by C01 after any markdown is displayed — there is no `--print` flag.
+- PDF export is always **non-fatal**: by the time the user is asked about PDF, they have already seen the markdown. Errors return to the menu.
 - The **CSS file** lives at `src/components/c06-pdf-exporter/styles/pdf.css` and is **inlined** into the HTML — never referenced as an external URL.
 - The **pdfPath** is always derived by replacing `.md` with `.pdf` in the markdownPath — no other logic.
-- PDF failure is **fatal for `--build --print`** but **non-fatal for `--show --print`** — C01 controls this distinction, not C06.
 - `waitUntil: 'networkidle0'` is safe here because the HTML has no network references.
 - Puppeteer uses the same Chromium binary as C03 (Playwright) — both are installed at `npm install` time.
 
 ## Spec Version
-Last updated: 2026-05-24 | Status: Ready
+Last updated: 2026-05-27 | Status: Ready (CHG-002)

@@ -1,42 +1,43 @@
+import { promises as fs } from 'fs';
 import { GoogleGenerativeAI } from '@google/generative-ai';
-import { dataPath, writeFile, readFile, fileExists, listFiles } from '../../utils/fileUtils.js';
+import { workspacePath } from '../../config/bootstrap.js';
+import { writeFile, readFile, fileExists } from '../../utils/fileUtils.js';
 import { djb2Hash, ESSAY_TYPE_SLUGS } from '../../utils/slugUtils.js';
 import { loadPrompt } from '../../ai/promptLoader.js';
-import { getGeminiApiKey, getGeminiModel } from '../../config/env.js';
+import { getApiKey, getModel } from '../../config/bootstrap.js';
 import { waitForSelect, waitForText, waitForConfirm } from '../../utils/tui.js';
-
-// ─── Retry helper ─────────────────────────────────────────────────────────────
 
 async function withRetry<T>(fn: () => Promise<T>, label: string): Promise<T> {
   try {
     return await fn();
   } catch {
-    console.log(`Retrying in 30 seconds... (attempt 2 of 2) [${label}]`);
+    process.stdout.write(`Retrying in 30 seconds... (attempt 2 of 2) [${label}]\n`);
     await new Promise(r => setTimeout(r, 30000));
     return await fn();
   }
 }
 
-// ─── Public API ───────────────────────────────────────────────────────────────
-
-// [C05-F01, C05-F02, C05-F03, C05-F04] Build essay outline
-export async function buildEssay(studentSlug: string, universitySlug: string): Promise<{ essayPath: string }> {
-  // [C05-F02] Validate profiles exist
-  const studentProfilePath = dataPath(studentSlug, 'profile.md');
-  const universityProfilePath = dataPath(studentSlug, universitySlug, 'profile.md');
+// [C05-F01, C05-F02, C05-F03, C05-F04]
+export async function buildEssay(
+  studentSlug: string,
+  uniSlug: string,
+  timestamp: string,
+): Promise<{ essayPath: string; timestamp: string }> {
+  const studentProfilePath = workspacePath('students', studentSlug, 'profile.md');
+  const uniProfilePath = workspacePath('students', studentSlug, 'universities', uniSlug, 'profile.md');
 
   if (!(await fileExists(studentProfilePath))) {
-    throw new Error(`No student profile found for "${studentSlug}".`);
+    throw new Error('No student profile found. Build a student profile first.');
   }
-  if (!(await fileExists(universityProfilePath))) {
-    throw new Error(`No university profile found for "${universitySlug}". Run: ao --university-profile --build --domain <domain>`);
+  if (!(await fileExists(uniProfilePath))) {
+    throw new Error('No university profile found. Build a university profile first.');
   }
 
-  // [C05-F01] Collect essay details via full-screen TUI
+  // [C05-F01] Collect essay details via tui.tsx
   const essayType = await waitForSelect(
     Object.keys(ESSAY_TYPE_SLUGS).map(t => ({ label: t, value: t })),
     'Essay Advisor › Essay Type',
-    `Student: ${studentSlug}   University: ${universitySlug}`,
+    `Student: ${studentSlug}   University: ${uniSlug}`,
   );
 
   const essayPrompt = await waitForText(
@@ -54,30 +55,26 @@ export async function buildEssay(studentSlug: string, universitySlug: string): P
   );
   const wordLimit = wordLimitRaw.trim() || 'Not specified';
 
-  // [C05-F01] Generate slug and check for existing file
+  // Overwrite check within the dated dir
   const typeSlug = ESSAY_TYPE_SLUGS[essayType] ?? 'essay';
   const hash = djb2Hash(essayPrompt.trim());
-  const fileName = `${typeSlug}-${hash}.md`;
-  const essaysDir = dataPath(studentSlug, universitySlug, 'essays');
-  const essayPath = `${essaysDir}/${fileName}`;
+  const dir = workspacePath('students', studentSlug, 'universities', uniSlug, 'essays', timestamp);
+  const essayPath = `${dir}/${typeSlug}-${hash}.md`;
 
   if (await fileExists(essayPath)) {
     const overwrite = await waitForConfirm(
-      'An essay outline already exists for this prompt. Overwrite?',
+      'An essay outline already exists for this timestamp. Overwrite?',
       'Essay Advisor › Overwrite?',
       `${essayType}   Student: ${studentSlug}`,
     );
     if (!overwrite) {
-      console.log('No changes made.');
-      return { essayPath };
+      return { essayPath, timestamp };
     }
   }
 
-  // [C05-F02] Load profiles
   const studentProfileContent = await readFile(studentProfilePath);
-  const universityProfileContent = await readFile(universityProfilePath);
+  const universityProfileContent = await readFile(uniProfilePath);
 
-  // [C05-F03] Call Gemini
   const prompt = await loadPrompt('c05-essay-generate', {
     ESSAY_TYPE: essayType,
     ESSAY_PROMPT: essayPrompt.trim().slice(0, 1000),
@@ -86,56 +83,59 @@ export async function buildEssay(studentSlug: string, universitySlug: string): P
     UNIVERSITY_PROFILE: universityProfileContent,
   });
 
-  const genAI = new GoogleGenerativeAI(getGeminiApiKey());
-  const model = genAI.getGenerativeModel({
-    model: getGeminiModel(),
-    generationConfig: { temperature: 0.8 },
-  });
+  const apiKey = getApiKey();
+  const modelName = getModel();
+  if (!apiKey || !modelName) throw new Error('Gemini API key or model not configured. Go to Config to set them.');
 
-  const result = await withRetry(
-    () => model.generateContent(prompt),
-    'Gemini essay generation',
-  );
+  const genAI = new GoogleGenerativeAI(apiKey);
+  const model = genAI.getGenerativeModel({ model: modelName, generationConfig: { temperature: 0.8 } });
 
+  const result = await withRetry(() => model.generateContent(prompt), 'Gemini essay generation');
   const essayMarkdown = result.response.text().trim();
+  if (!essayMarkdown) throw new Error('Gemini returned empty response. Try again.');
 
-  // [C05-F04] Store with disclaimer
   const disclaimer = `> ⚠️ IMPORTANT: The inspiration samples below are provided to help you understand\n> how to draw on your own experiences. Do NOT submit them as your own work.\n> Use them only as a reference for tone, structure, and how to connect your\n> profile to the prompt. Your essay must be written in your own voice.`;
   const finalMarkdown = essayMarkdown.includes('⚠️ IMPORTANT') ? essayMarkdown : `${disclaimer}\n\n${essayMarkdown}`;
 
+  await fs.mkdir(dir, { recursive: true });
   await writeFile(essayPath, finalMarkdown + '\n');
 
-  console.log('\n⚠️  REMINDER: The inspiration samples in this outline are for reference only.');
-  console.log('   Do NOT submit them as your own work. Write your essay in your own voice.\n');
-
-  return { essayPath };
+  return { essayPath, timestamp };
 }
 
-// [C05-F05] Show stored essay outline
-export async function showEssay(studentSlug: string, universitySlug: string): Promise<{ markdownPath: string }> {
-  const essaysDir = dataPath(studentSlug, universitySlug, 'essays');
-  const files = await listFiles(essaysDir, '.md');
-
+// [C05-F05]
+export async function showEssay(
+  studentSlug: string,
+  uniSlug: string,
+  timestamp: string,
+): Promise<{ markdownPath: string }> {
+  const dir = workspacePath('students', studentSlug, 'universities', uniSlug, 'essays', timestamp);
+  let files: string[] = [];
+  try {
+    const entries = await fs.readdir(dir);
+    files = entries.filter(f => f.endsWith('.md'));
+  } catch {
+    // dir missing
+  }
   if (files.length === 0) {
-    throw new Error(
-      `No essay outlines found for "${studentSlug}" → "${universitySlug}". ` +
-      `Run: ao --essay --build --student ${studentSlug} --university ${universitySlug}`,
-    );
+    throw new Error('No essay outline found for the selected timestamp.');
   }
-
-  let selectedFile: string;
-  if (files.length === 1) {
-    selectedFile = files[0];
-  } else {
-    selectedFile = await waitForSelect(
-      files.map(f => ({ label: f, value: f })),
-      'Essay Advisor › Select Outline',
-      `Student: ${studentSlug}   University: ${universitySlug}`,
-    );
-  }
-
-  const markdownPath = `${essaysDir}/${selectedFile}`;
+  const markdownPath = `${dir}/${files[0]}`;
   const content = await readFile(markdownPath);
-  console.log(content);
+  process.stdout.write(content + '\n');
   return { markdownPath };
+}
+
+// [C05-F06]
+export async function listEssays(studentSlug: string, uniSlug: string): Promise<string[]> {
+  const dir = workspacePath('students', studentSlug, 'universities', uniSlug, 'essays');
+  try {
+    const entries = await fs.readdir(dir);
+    return entries
+      .filter(e => /^\d{4}-\d{2}-\d{2}-\d{4}$/.test(e))
+      .sort()
+      .reverse();
+  } catch {
+    return [];
+  }
 }

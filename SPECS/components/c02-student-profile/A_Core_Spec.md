@@ -1,5 +1,7 @@
 # C02 — Student Profile: Core Specification
 
+> ⚠️ Revised 2026-05-27 (CHG-002): Data paths changed from `data/students/` to `university-ao/students/` via `C07.workspacePath()`. Delete feature added. Function signatures updated. All path references below reflect the new structure.
+
 ## Purpose
 
 Collects a student's holistic academic and extracurricular profile through a nested, menu-driven interface and stores it as a structured JSON and markdown file. On finalization, uses Gemini to enhance text fields — correcting spelling/grammar, ensuring consistency, and framing inputs as student strengths in an honest voice — before generating `profile.md`. Raw user input is always preserved in `profile.json`; the LLM enhancement is a rendering step only.
@@ -10,13 +12,14 @@ Collects a student's holistic academic and extracurricular profile through a nes
 
 | Status | ID | Description | Priority | Req Ref | Doc Level |
 | :----- | :- | :---------- | :------- | :------ | :-------- |
-| `Complete` | C02-F01 | Navigate and edit the student profile via a full-screen ink-based TUI; track completion status per field/section; gate finalization until all fields are `set` or `skipped` | P1 | REQ-0001, REQ-0002 | - |
-| `Revised` | C02-F02 | Load existing `profile.json` on re-entry; resume the full-screen menu with current values pre-filled and completion indicators intact. Parsed JSON is merged over a fresh `emptyProfile()` so any newly-added fields (e.g., `shadowing`, `research`) default to safe empty values on older saved profiles. | P1 | REQ-0001 | - |
-| `Complete` | C02-F03 | Display the stored student profile markdown to stdout | P1 | REQ-0003 | - |
-| `Complete` | C02-F04 | On Finalize: enhance all text fields via Gemini (honest student voice, no marketing tone), then generate `profile.md` from enhanced data — raw `profile.json` is never modified | P1 | REQ-0013 | - |
-| `Complete` | C02-F05 | Write `profile.json` after every individual field input — never lose data mid-session | P1 | REQ-0001 | - |
-| `Revised` | C02-F06 | Capture shadowing experiences (organization, field, hours, period, description) via list management TUI; skippable per entry and as a whole section | P2 | REQ-0001 | - |
-| `Revised` | C02-F07 | Capture research experiences (project title, institution, mentor, period, hours/week, description) via list management TUI; skippable per entry and as a whole section | P2 | REQ-0001 | - |
+| `Not Started` | C02-F01 | Navigate and edit the student profile via a full-screen ink-based TUI; track completion status per field/section; gate finalization until all fields are `set` or `skipped` | P1 | REQ-0001, REQ-0002 | - |
+| `Not Started` | C02-F02 | Load existing `profile.json` on re-entry; resume the full-screen menu with current values pre-filled and completion indicators intact. Parsed JSON is merged over a fresh `emptyProfile()` so any newly-added fields default to safe empty values on older saved profiles. | P1 | REQ-0001 | - |
+| `Not Started` | C02-F03 | Display the stored student profile markdown to stdout | P1 | REQ-0003 | - |
+| `Not Started` | C02-F04 | On Finalize: enhance all text fields via Gemini (honest student voice, no marketing tone), then generate `profile.md` from enhanced data — raw `profile.json` is never modified | P1 | REQ-0013 | - |
+| `Not Started` | C02-F05 | Write `profile.json` after every individual field input — never lose data mid-session | P1 | REQ-0001 | - |
+| `Not Started` | C02-F06 | Capture shadowing experiences (organization, field, hours, period, description) via list management TUI; skippable per entry and as a whole section | P2 | REQ-0001 | - |
+| `Not Started` | C02-F07 | Capture research experiences (project title, institution, mentor, period, hours/week, description) via list management TUI; skippable per entry and as a whole section | P2 | REQ-0001 | - |
+| `Not Started` | C02-F08 | Delete the student's entire workspace directory (`university-ao/students/<slug>/`) when called by C01 after delete confirmation | P1 | REQ-0018 | - |
 
 > ⚠️ Revised 2026-05-25: C02-F01 and C02-F02 revised — `enquirer` replaced with `ink` + `@inkjs/ui` for full-screen, large-font TUI. All menu logic and data flows are preserved; only the rendering layer changes. Decision ref: D-PRODUCT-AO000001, D-TECH-AO000008, D-TECH-AO000009.
 
@@ -254,22 +257,25 @@ Each field carries one of three statuses stored in `profile.json`:
 ## Data Flows
 
 **F01 — New profile:**
-`C01 dispatches buildStudentProfile(name?) → prompt for name if not provided → initialize ProfileData with all fields pending → open Main Menu → user navigates and edits fields → profile.json written after every field input (F05-JSON) → user selects Finalize & Save → write profile.md once (F05-MD) → return { profilePath }`
+`C01 dispatches buildStudentProfile(studentSlug?) → prompt for name if not provided → initialize ProfileData with all fields pending → open Main Menu → user navigates and edits fields → profile.json written after every field input (F05-JSON) → user selects Finalize & Save → write profile.md once (F05-MD) → return { profilePath, studentSlug }`
 
 **F02 — Resume/edit existing:**
-`C01 dispatches buildStudentProfile(name) → detect existing profile.json → load full ProfileData (values + field statuses) → open Main Menu with indicators reflecting loaded state → user navigates and edits → profile.json written after every field input (F05-JSON) → user selects Finalize & Save → write profile.md once (F05-MD) → return { profilePath }`
+`C01 dispatches buildStudentProfile(studentSlug) → detect existing university-ao/students/<slug>/profile.json → load full ProfileData → merge over emptyProfile() → open Main Menu with indicators reflecting loaded state → user navigates and edits → profile.json written after every field input (F05-JSON) → user selects Finalize & Save → write profile.md once (F05-MD) → return { profilePath, studentSlug }`
 
 **F03 — Show:**
-`C01 dispatches showStudentProfile(name) → resolve data/students/<slug>/profile.md → file exists? → read and print to stdout → return { markdownPath } → else: print "No profile found" + exit(1)`
+`C01 dispatches showStudentProfile(studentSlug) → resolve workspacePath('students', slug, 'profile.md') → file exists? → read and print to stdout → return { markdownPath } → else: print "No profile found" + exit(1)`
 
 **F04 — Enhance + generate markdown:**
-`On Finalize & Save → load ProfileData from profile.json (raw, unmodified) → call Gemini with full ProfileData → receive EnhancedProfileData (text fields polished, raw values for scalar fields) → renderProfileMarkdown(enhancedData) → write profile.md → profile.json is never written during this step`
+`On Finalize & Save → load ProfileData from profile.json (raw, unmodified) → call Gemini with full ProfileData → receive EnhancedProfileData (text fields polished, raw values for scalar fields) → renderProfileMarkdown(enhancedData) → write workspacePath('students', slug, 'profile.md') → profile.json is never written during this step`
 
 **F05-JSON — Incremental save:**
-`After every individual field input → JSON.stringify(ProfileData including field statuses) → write to data/students/<slug>/profile.json`
+`After every individual field input → JSON.stringify(ProfileData including field statuses) → write to workspacePath('students', slug, 'profile.json')`
 
 **F05-MD — Final markdown generation:**
-`On Finalize & Save → renderProfileMarkdown(data) → write to data/students/<slug>/profile.md`
+`On Finalize & Save → renderProfileMarkdown(data) → write to workspacePath('students', slug, 'profile.md')`
+
+**F08 — Delete:**
+`C01 dispatches deleteStudentProfile(studentSlug) → fs.rm(workspacePath('students', slug), { recursive: true, force: true }) → done`
 
 ---
 

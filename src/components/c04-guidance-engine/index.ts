@@ -1,73 +1,87 @@
+import { promises as fs } from 'fs';
 import { GoogleGenerativeAI } from '@google/generative-ai';
-import { dataPath, writeFile, readFile, fileExists } from '../../utils/fileUtils.js';
+import { workspacePath } from '../../config/bootstrap.js';
+import { writeFile, readFile, fileExists } from '../../utils/fileUtils.js';
 import { loadPrompt } from '../../ai/promptLoader.js';
-import { getGeminiApiKey, getGeminiModel } from '../../config/env.js';
-
-// ─── Retry helper ─────────────────────────────────────────────────────────────
+import { getApiKey, getModel } from '../../config/bootstrap.js';
 
 async function withRetry<T>(fn: () => Promise<T>, label: string): Promise<T> {
   try {
     return await fn();
   } catch {
-    console.log(`Retrying in 30 seconds... (attempt 2 of 2) [${label}]`);
+    process.stdout.write(`Retrying in 30 seconds... (attempt 2 of 2) [${label}]\n`);
     await new Promise(r => setTimeout(r, 30000));
     return await fn();
   }
 }
 
-// ─── Public API ───────────────────────────────────────────────────────────────
-
-// [C04-F01, C04-F02, C04-F03] Generate and store guidance report
-export async function buildGuidance(studentSlug: string, universitySlug: string): Promise<{ reportPath: string }> {
-  // [C04-F01] Load and validate both profiles
-  const studentProfilePath = dataPath(studentSlug, 'profile.md');
-  const universityProfilePath = dataPath(studentSlug, universitySlug, 'profile.md');
+// [C04-F01, C04-F02, C04-F03]
+export async function buildGuidance(
+  studentSlug: string,
+  uniSlug: string,
+  timestamp: string,
+): Promise<{ reportPath: string; timestamp: string }> {
+  const studentProfilePath = workspacePath('students', studentSlug, 'profile.md');
+  const uniProfilePath = workspacePath('students', studentSlug, 'universities', uniSlug, 'profile.md');
 
   if (!(await fileExists(studentProfilePath))) {
-    throw new Error(`No student profile found for "${studentSlug}". Run: ao --student-profile --build --name ${studentSlug}`);
+    throw new Error(`No student profile found. Build a student profile first.`);
   }
-  if (!(await fileExists(universityProfilePath))) {
-    throw new Error(`No university profile found for "${universitySlug}". Run: ao --university-profile --build --domain <domain>`);
+  if (!(await fileExists(uniProfilePath))) {
+    throw new Error(`No university profile found. Build a university profile first.`);
   }
 
   const studentProfileContent = await readFile(studentProfilePath);
-  const universityProfileContent = await readFile(universityProfilePath);
+  const universityProfileContent = await readFile(uniProfilePath);
 
-  // [C04-F02] Call Gemini
   const prompt = await loadPrompt('c04-guidance-generate', {
     STUDENT_PROFILE: studentProfileContent,
     UNIVERSITY_PROFILE: universityProfileContent,
   });
 
-  const genAI = new GoogleGenerativeAI(getGeminiApiKey());
-  const model = genAI.getGenerativeModel({
-    model: getGeminiModel(),
-    generationConfig: { temperature: 0.7 },
-  });
+  const apiKey = getApiKey();
+  const modelName = getModel();
+  if (!apiKey || !modelName) throw new Error('Gemini API key or model not configured. Go to Config to set them.');
 
-  const result = await withRetry(
-    () => model.generateContent(prompt),
-    'Gemini guidance generation'
-  );
+  const genAI = new GoogleGenerativeAI(apiKey);
+  const model = genAI.getGenerativeModel({ model: modelName, generationConfig: { temperature: 0.7 } });
 
+  const result = await withRetry(() => model.generateContent(prompt), 'Gemini guidance generation');
   const guidanceMarkdown = result.response.text().trim();
+  if (!guidanceMarkdown) throw new Error('Gemini returned empty response. Try again.');
 
-  // [C04-F03] Store
-  const reportPath = dataPath(studentSlug, universitySlug, 'guidance.md');
+  const dir = workspacePath('students', studentSlug, 'universities', uniSlug, 'guidance', timestamp);
+  await fs.mkdir(dir, { recursive: true });
+  const reportPath = `${dir}/guidance.md`;
   await writeFile(reportPath, guidanceMarkdown + '\n');
-  return { reportPath };
+  return { reportPath, timestamp };
 }
 
-// [C04-F04] Show stored guidance report
-export async function showGuidance(studentSlug: string, universitySlug: string): Promise<{ markdownPath: string }> {
-  const markdownPath = dataPath(studentSlug, universitySlug, 'guidance.md');
+// [C04-F04]
+export async function showGuidance(
+  studentSlug: string,
+  uniSlug: string,
+  timestamp: string,
+): Promise<{ markdownPath: string }> {
+  const markdownPath = workspacePath('students', studentSlug, 'universities', uniSlug, 'guidance', timestamp, 'guidance.md');
   if (!(await fileExists(markdownPath))) {
-    throw new Error(
-      `No guidance report found for "${studentSlug}" → "${universitySlug}". ` +
-      `Run: ao --guidance --build --student ${studentSlug} --university ${universitySlug}`
-    );
+    throw new Error(`No guidance report found for the selected timestamp.`);
   }
   const content = await readFile(markdownPath);
-  console.log(content);
+  process.stdout.write(content + '\n');
   return { markdownPath };
+}
+
+// [C04-F05]
+export async function listGuidance(studentSlug: string, uniSlug: string): Promise<string[]> {
+  const dir = workspacePath('students', studentSlug, 'universities', uniSlug, 'guidance');
+  try {
+    const entries = await fs.readdir(dir);
+    return entries
+      .filter(e => /^\d{4}-\d{2}-\d{2}-\d{4}$/.test(e))
+      .sort()
+      .reverse();
+  } catch {
+    return [];
+  }
 }

@@ -31,8 +31,3 @@ export async function listFiles(dirPath: string, ext: string): Promise<string[]>
     return [];
   }
 }
-
-// Returns the absolute path rooted at the project data/ directory
-export function dataPath(...segments: string[]): string {
-  return path.join(process.cwd(), 'data', ...segments);
-}

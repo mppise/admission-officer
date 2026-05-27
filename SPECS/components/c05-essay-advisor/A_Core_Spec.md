@@ -1,5 +1,7 @@
 # C05 — Essay Advisor: Core Specification
 
+> ⚠️ Revised 2026-05-27 (CHG-002): Data paths changed to `university-ao/students/<s>/universities/<u>/essays/<YYYY-MM-DD-HHmm>/`. Multiple dated outputs supported. `enquirer` removed — prompt collection uses `tui.tsx`. New function signatures: `buildEssay` receives `timestamp`; `showEssay` and `listEssays` added. All paths via `C07.workspacePath()`.
+
 ## Purpose
 
 Collects an essay prompt from the student interactively, reads the student and university profiles, then calls Gemini to produce a structured essay outline plus inspiration samples anchored to the student's actual profile data. Covers personal statements and supplemental essays. One prompt per invocation. Samples are explicitly marked as inspirational — not submission-ready.
@@ -10,13 +12,12 @@ Collects an essay prompt from the student interactively, reads the student and u
 
 | Status | ID | Description | Priority | Req Ref | Doc Level |
 | :----- | :- | :---------- | :------- | :------ | :-------- |
-| `Revised` | C05-F01 | Collect essay prompt and essay type from the student interactively via the shared `tui.tsx` ink helpers | P1 | REQ-0009, REQ-0010 | - |
-
-> ⚠️ Revised 2026-05-26: C05-F01 inherits the visual revision in shared `src/utils/tui.tsx` — the active menu row renders as bold white-on-black inverted highlight, and `dimColor` is removed from hint, footer, and inactive rows. No structural or prompt-flow change. Decision ref: D-PRODUCT-AO000002.
-| `Complete` | C05-F02 | Load and validate student profile and university profile from filesystem | P1 | REQ-0009 | - |
-| `Complete` | C05-F03 | Call Gemini with both profiles and the essay prompt to generate a structured outline plus inspiration samples | P1 | REQ-0009, REQ-0010 | - |
-| `Complete` | C05-F04 | Store the essay outline as markdown at the canonical path, with prominent disclaimer | P1 | REQ-0009, REQ-0013 | - |
-| `Complete` | C05-F05 | Display the stored essay outline markdown to stdout | P1 | REQ-0011 | - |
+| `Not Started` | C05-F01 | Collect essay prompt and essay type from the student interactively via the shared `tui.tsx` ink helpers | P1 | REQ-0009, REQ-0010 | - |
+| `Not Started` | C05-F02 | Load and validate student profile and university profile from filesystem | P1 | REQ-0009 | - |
+| `Not Started` | C05-F03 | Call Gemini with both profiles and the essay prompt to generate a structured outline plus inspiration samples | P1 | REQ-0009, REQ-0010 | - |
+| `Not Started` | C05-F04 | Store the essay outline as markdown in a dated subdirectory, with prominent disclaimer | P1 | REQ-0009, REQ-0013, REQ-0019 | - |
+| `Not Started` | C05-F05 | Display a stored essay outline markdown to stdout | P1 | REQ-0011 | - |
+| `Not Started` | C05-F06 | List all dated essay directories for a student+university pair | P1 | REQ-0019 | - |
 
 ---
 
@@ -116,19 +117,22 @@ Based on <universityName>'s profile, these phrases and themes resonate with thei
 ## Data Flows
 
 **F01 — Collect prompt:**
-`--essay --build dispatched by C01 → run Enquirer prompts (essayType, essayPrompt, wordLimit) → generate slug → check for existing file → if exists: confirm overwrite → proceed`
+`buildEssay dispatched by C01 → render essay type select (tui.tsx SpaciousSelect) → render essay prompt input (waitForText) → render word limit input (waitForText, optional) → return { essayType, essayPrompt, wordLimit }`
 
 **F02 — Load profiles:**
-`studentName + universityName → read data/students/<slug>/profile.md → read data/universities/<uniSlug>/profile.md → both present? → proceed → else: print error + exit(1)`
+`studentSlug + uniSlug → read workspacePath('students', s, 'profile.md') → read workspacePath('students', s, 'universities', u, 'profile.md') → both present? → proceed → else: print error + exit(1)`
 
 **F03 — Generate via Gemini:**
 `studentProfileText + universityProfileText + essayType + essayPrompt + wordLimit → [load prompt from src/ai/prompts/c05-essay-generate.md] → [inject content] → [call Gemini generateContent async] → essayMarkdown string`
 
 **F04 — Store:**
-`essayMarkdown → ensure dir data/students/<slug>/<uniSlug>/essays/ exists → fs.writeFile(<slug>.md) → return { essayPath }`
+`essayMarkdown + timestamp → ensure dir workspacePath('students', s, 'universities', u, 'essays', timestamp) → fs.writeFile('essay.md') → return { essayPath, timestamp }`
 
 **F05 — Show:**
-`studentName + universityName → list available essays or resolve by slug → read → print to stdout → return { markdownPath }`
+`studentSlug + uniSlug + timestamp → resolve workspacePath('students', s, 'universities', u, 'essays', timestamp, 'essay.md') → read → print to stdout → return { markdownPath }`
+
+**F06 — List:**
+`studentSlug + uniSlug → fs.readdir(workspacePath('students', s, 'universities', u, 'essays')) → return sorted string[] of timestamps (newest first) → empty array if dir doesn't exist`
 
 ---
 

@@ -1,21 +1,30 @@
 # C03 — University Profile: Interfaces
 
+> ⚠️ Revised 2026-05-27 (CHG-002): Signatures updated; `deleteUniversityProfile` added; all data paths updated to `university-ao/students/<s>/universities/<u>/`; `enquirer` removed; domain is now collected by C01 before calling C03.
+
 ## Exposed Functions (called by C01)
 
 ```typescript
-buildUniversityProfile(domain: string, name?: string): Promise<{ profilePath: string }>
+buildUniversityProfile(domain: string, studentSlug: string, uniSlug?: string): Promise<{ profilePath: string; uniSlug: string }>
 ```
-- `domain`: university website domain e.g. `mit.edu` (no protocol prefix required; C03 prepends `https://`)
-- `name`: optional override for directory slug; if omitted, derived from domain by stripping TLD
-- Prerequisite check (student profile + intendedMajor) is performed by C01 before this is called
-- Returns the absolute path to the saved `profile.md`
+- `domain`: university website domain e.g. `mit.edu` (C03 prepends `https://`).
+- `studentSlug`: required — university profile is stored under the student's directory.
+- `uniSlug`: optional override; if omitted, derived from domain by stripping TLD.
+- Returns the absolute path to the saved `profile.md` and the resolved `uniSlug`.
 
 ```typescript
-showUniversityProfile(name: string): Promise<{ markdownPath: string }>
+showUniversityProfile(studentSlug: string, uniSlug: string): Promise<{ markdownPath: string }>
 ```
-- Reads and prints `data/universities/<slug>/profile.md` to stdout
-- Returns the absolute path (for C06 `--print` composition)
-- Throws with actionable message if file does not exist
+- Reads and prints `university-ao/students/<s>/universities/<u>/profile.md` to stdout.
+- Returns the absolute path (for C06 PDF export).
+- Throws with actionable message if file does not exist.
+
+```typescript
+deleteUniversityProfile(studentSlug: string, uniSlug: string): Promise<void>
+```
+- Removes `university-ao/students/<s>/universities/<u>/` recursively.
+- Called by C01 **after** delete confirmation — C03 does not confirm.
+- Throws on filesystem error; C01 handles display.
 
 ---
 
@@ -48,7 +57,7 @@ The prompt instructs Gemini to extract the following structured fields from the 
 
 ## Markdown File Schema
 
-**Path:** `data/universities/<slug>/profile.md`
+**Path:** `university-ao/students/<studentSlug>/universities/<uniSlug>/profile.md`
 **Encoding:** UTF-8
 
 ```markdown
@@ -107,15 +116,14 @@ The prompt instructs Gemini to extract the following structured fields from the 
 
 ## Failed URLs File Schema
 
-**Path:** `data/universities/<slug>/failed-urls.md`
+**Path:** `university-ao/students/<studentSlug>/universities/<uniSlug>/failed-urls.md`
 
 ```markdown
 # Failed Scrape URLs — <universityName>
 
 **Generated:** <ISO date>
 
-The following URLs could not be scraped. You may retry manually or re-run:
-`ao --university-profile --build --domain <domain>`
+The following URLs could not be scraped. You may retry by selecting "Update University" from the menu.
 
 | Category | URL Attempted | Reason |
 | :------- | :------------ | :----- |

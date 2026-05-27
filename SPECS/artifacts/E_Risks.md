@@ -23,7 +23,7 @@ license: Apache-2.0 (see LICENSE in project root)
 
 | Total | Pending `[ ]` | Accepted `[X]` | Mitigated `[M]` | Dismissed `[-]` | Deferred `[>]` | Critical `HH` |
 | :---: | :-----------: | :------------: | :-------------: | :-------------: | :------------: | :-----------: |
-| 5 | 0 | 5 | 0 | 0 | 0 | 0 |
+| 6 | 0 | 6 | 0 | 0 | 0 | 0 |
 
 ---
 
@@ -43,6 +43,7 @@ license: Apache-2.0 (see LICENSE in project root)
 | :----: | :- | :--- | :--------: | :------: | :---: | :--------- | :---------- | :---- | :-------: |
 | `[X]` | R-TC-AO000002 | Gemini API quota exceeded mid-session (e.g., during university profile build with many pages) | M | M | MM | Batch page content before sending to Gemini; minimize API calls per command | Retry once after 30s; surface quota error with link to Google AI Studio quota page | DevAgent | Planning gate |
 | `[X]` | R-TC-AO000003 | Puppeteer PDF rendering produces poorly formatted output for complex markdown | L | M | LM | Use a clean CSS template for the HTML→PDF pipeline; test with real profile data | Allow user to open the source markdown directly as fallback | DevAgent | Detailed Design |
+| `[X]` | R-TC-AO000004 | Config screen writes empty or malformed `GEMINI_API_KEY`/`GEMINI_MODEL` to `university-ao/.env`, causing all AI functions to fail on next run | M | M | MM | Validate non-empty before writing; show current value masked in Config screen | Surface clear error at startup if key is missing or blank; direct user back to Config | DevAgent | Detailed Design |
 
 ## Business & Product
 
@@ -80,3 +81,4 @@ license: Apache-2.0 (see LICENSE in project root)
 | ID | Description | Date | Author |
 | :- | :---------- | :--: | :----- |
 | CHG-001 | Initial risks identified during Planning | 2026-05-24 | SpecGantry |
+| CHG-002 | R-TC-AO000004 added — Config screen `.env` write risk (CHG-002 menu overhaul) | 2026-05-27 | SpecGantry |

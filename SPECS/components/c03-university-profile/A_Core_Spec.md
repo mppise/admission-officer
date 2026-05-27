@@ -1,5 +1,7 @@
 # C03 — University Profile: Core Specification
 
+> ⚠️ Revised 2026-05-27 (CHG-002): Data paths changed to `university-ao/students/<s>/universities/<u>/` via `C07.workspacePath()`. `enquirer` removed — all interactive prompts use `tui.tsx`. Delete feature added. Function signatures updated. The domain prompt is now collected by C01 before calling C03.
+
 ## Purpose
 
 Scrapes a university's public website using Playwright (headless Chromium), extracts structured institutional profile data via Gemini API, and stores it as a markdown file. Also provides display of the stored profile. Requires a valid student profile with intended major as a prerequisite (enforced by C01).
@@ -10,11 +12,12 @@ Scrapes a university's public website using Playwright (headless Chromium), extr
 
 | Status | ID | Description | Priority | Req Ref | Doc Level |
 | :----- | :- | :---------- | :------- | :------ | :-------- |
-| `Complete` | C03-F01 | Scrape a university website across targeted pages using Playwright and extract raw HTML content | P1 | REQ-0005 | - |
-| `Complete` | C03-F02 | Send batched scraped content to Gemini API to extract structured university profile data | P1 | REQ-0005 | - |
-| `Complete` | C03-F03 | Store the extracted university profile as markdown at the canonical path | P1 | REQ-0005, REQ-0013 | - |
-| `Complete` | C03-F04 | Log any URLs that failed to scrape to `failed-urls.md` for manual retry | P1 | REQ-0005 | - |
-| `Complete` | C03-F05 | Display the stored university profile markdown to stdout | P1 | REQ-0006 | - |
+| `Not Started` | C03-F01 | Scrape a university website across targeted pages using Playwright and extract raw HTML content | P1 | REQ-0005 | - |
+| `Not Started` | C03-F02 | Send batched scraped content to Gemini API to extract structured university profile data | P1 | REQ-0005 | - |
+| `Not Started` | C03-F03 | Store the extracted university profile as markdown at the canonical path under the student's university directory | P1 | REQ-0005, REQ-0013 | - |
+| `Not Started` | C03-F04 | Log any URLs that failed to scrape to `failed-urls.md` for manual retry | P1 | REQ-0005 | - |
+| `Not Started` | C03-F05 | Display the stored university profile markdown to stdout | P1 | REQ-0006 | - |
+| `Not Started` | C03-F06 | Delete the university directory (`university-ao/students/<s>/universities/<u>/`) when called by C01 after delete confirmation | P1 | REQ-0018 | - |
 
 ---
 
@@ -62,13 +65,16 @@ Strip all HTML tags before passing to Gemini. Max content per page: 3000 charact
 `raw content map + student intendedMajor → [batch content under 20k chars] → [load prompt from src/ai/prompts/c03-university-extract.md] → [call Gemini generateContent] → [parse structured response] → UniversityProfileData object`
 
 **F03 — Store:**
-`UniversityProfileData → renderUniversityMarkdown(data) → fs.writeFile(data/universities/<slug>/profile.md) → return { profilePath }`
+`UniversityProfileData → renderUniversityMarkdown(data) → fs.writeFile(workspacePath('students', studentSlug, 'universities', uniSlug, 'profile.md')) → return { profilePath, uniSlug }`
 
 **F04 — Log failed URLs:**
-`failedUrls[] → fs.writeFile(data/universities/<slug>/failed-urls.md) → print "X URLs failed — see data/universities/<slug>/failed-urls.md"`
+`failedUrls[] → fs.writeFile(workspacePath('students', studentSlug, 'universities', uniSlug, 'failed-urls.md')) → print "X URLs failed — see university-ao/students/<s>/universities/<u>/failed-urls.md"`
 
 **F05 — Show:**
-`name → resolve data/universities/<slug>/profile.md → read → print to stdout → return { markdownPath }`
+`studentSlug + uniSlug → resolve workspacePath('students', studentSlug, 'universities', uniSlug, 'profile.md') → read → print to stdout → return { markdownPath }`
+
+**F06 — Delete:**
+`studentSlug + uniSlug → fs.rm(workspacePath('students', studentSlug, 'universities', uniSlug), { recursive: true, force: true }) → done`
 
 ---
 

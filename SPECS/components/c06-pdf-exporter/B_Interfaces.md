@@ -1,5 +1,7 @@
 # C06 — PDF Exporter: Interfaces
 
+> ⚠️ Revised 2026-05-27 (CHG-002): Path contract examples updated to `university-ao/` with nested university structure.
+
 ## Exposed Function (called by C01)
 
 ```typescript
@@ -14,10 +16,10 @@ exportToPdf(markdownPath: string): Promise<{ pdfPath: string }>
 
 | Input | Output |
 | :---- | :----- |
-| `data/students/john-doe/profile.md` | `data/students/john-doe/profile.pdf` |
-| `data/universities/mit/profile.md` | `data/universities/mit/profile.pdf` |
-| `data/students/john-doe/mit/guidance.md` | `data/students/john-doe/mit/guidance.pdf` |
-| `data/students/john-doe/mit/essays/personal-statement-a3f9c2.md` | `data/students/john-doe/mit/essays/personal-statement-a3f9c2.pdf` |
+| `university-ao/students/john-doe/profile.md` | `university-ao/students/john-doe/profile.pdf` |
+| `university-ao/students/john-doe/universities/mit/profile.md` | `university-ao/students/john-doe/universities/mit/profile.pdf` |
+| `university-ao/students/john-doe/universities/mit/guidance/<ts>/guidance.md` | `university-ao/students/john-doe/universities/mit/guidance/<ts>/guidance.pdf` |
+| `university-ao/students/john-doe/universities/mit/essays/<ts>/essay.md` | `university-ao/students/john-doe/universities/mit/essays/<ts>/essay.pdf` |
 
 ---
 

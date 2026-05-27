@@ -1,9 +1,10 @@
 import React from 'react';
+import { promises as fs } from 'fs';
 import { GoogleGenerativeAI } from '@google/generative-ai';
-import { dataPath, writeFile, readFile, fileExists } from '../../utils/fileUtils.js';
+import { workspacePath, getApiKey, getModel } from '../../config/bootstrap.js';
+import { writeFile, readFile, fileExists } from '../../utils/fileUtils.js';
 import { toSlug } from '../../utils/slugUtils.js';
 import { loadPrompt } from '../../ai/promptLoader.js';
-import { getGeminiApiKey, getGeminiModel } from '../../config/env.js';
 import { waitForSelect, waitForText, dotLeader, type SelectItem } from '../../utils/tui.js';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -72,11 +73,11 @@ interface ProfileData {
 // ─── Persistence ──────────────────────────────────────────────────────────────
 
 function jsonPath(slug: string): string {
-  return dataPath(slug, 'profile.json');
+  return workspacePath('students', slug, 'profile.json');
 }
 
 function mdPath(slug: string): string {
-  return dataPath(slug, 'profile.md');
+  return workspacePath('students', slug, 'profile.md');
 }
 
 // [C02-F05] Write profile.json after every field input
@@ -812,8 +813,11 @@ async function sectionTests(slug: string, data: ProfileData): Promise<void> {
 // ─── LLM Enhancement (C02-F04) ───────────────────────────────────────────────
 
 async function enhanceProfile(data: ProfileData): Promise<ProfileData> {
-  const genAI = new GoogleGenerativeAI(getGeminiApiKey());
-  const model = genAI.getGenerativeModel({ model: getGeminiModel(), generationConfig: { temperature: 0.2 } });
+  const apiKey = getApiKey();
+  const modelName = getModel();
+  if (!apiKey || !modelName) throw new Error('Gemini API key or model not configured. Go to Config to set them.');
+  const genAI = new GoogleGenerativeAI(apiKey);
+  const model = genAI.getGenerativeModel({ model: modelName, generationConfig: { temperature: 0.2 } });
   const prompt = await loadPrompt('c02-profile-enhance', { PROFILE_JSON: JSON.stringify(data, null, 2) });
 
   async function attempt(): Promise<ProfileData> {
@@ -1050,7 +1054,7 @@ function migrateProfile(parsed: Partial<ProfileData>): ProfileData {
 // ─── Public API ───────────────────────────────────────────────────────────────
 
 // [C02-F01, C02-F02] Build or resume a student profile via full-screen ink menu
-export async function buildStudentProfile(nameSlug?: string): Promise<{ profilePath: string }> {
+export async function buildStudentProfile(nameSlug?: string): Promise<{ profilePath: string; studentSlug: string }> {
   let slug = nameSlug;
   let data: ProfileData;
 
@@ -1080,16 +1084,22 @@ export async function buildStudentProfile(nameSlug?: string): Promise<{ profileP
   }
 
   await mainMenu(slug, data);
-  return { profilePath: mdPath(slug) };
+  return { profilePath: mdPath(slug), studentSlug: slug };
 }
 
 // [C02-F03] Show stored student profile
 export async function showStudentProfile(nameSlug: string): Promise<{ markdownPath: string }> {
   const markdownPath = mdPath(nameSlug);
   if (!(await fileExists(markdownPath))) {
-    throw new Error(`No profile found for "${nameSlug}". Run: ao --student-profile --build --name ${nameSlug}`);
+    throw new Error(`No profile found for "${nameSlug}". Build a student profile first.`);
   }
   const content = await readFile(markdownPath);
-  console.log(content);
+  process.stdout.write(content + '\n');
   return { markdownPath };
+}
+
+// [C02-F08] Delete student directory
+export async function deleteStudentProfile(nameSlug: string): Promise<void> {
+  const dir = workspacePath('students', nameSlug);
+  await fs.rm(dir, { recursive: true, force: true });
 }

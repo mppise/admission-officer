@@ -82,8 +82,8 @@ echo ""
 echo "── Step 3: Package validation ────────────────────────"
 
 # Verify shebang
-if ! head -1 dist/cli/index.js | grep -q "#!/usr/bin/env node"; then
-  echo "✗ dist/cli/index.js missing shebang"
+if ! head -1 dist/components/c01-cli-shell/index.js | grep -q "#!/usr/bin/env node"; then
+  echo "✗ dist/components/c01-cli-shell/index.js missing shebang"
   exit 1
 fi
 echo "✓ CLI entry point has shebang"
@@ -148,7 +148,7 @@ else
   echo ""
   echo "  Verify at: https://www.npmjs.com/package/$PKG_NAME"
   echo "  Install:   npm install -g $PKG_NAME"
-  echo "  Run:       ao --help"
+  echo "  Run:       ao"
 fi
 
 echo ""

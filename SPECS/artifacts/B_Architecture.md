@@ -44,13 +44,15 @@ license: Apache-2.0 (see LICENSE in project root)
 ### 1.1 High-Level Data Flow
 
 ```
-User invokes CLI
-  └─► C01 CLI Shell — parses switches, validates prerequisites
-        ├─► C02 Student Profile  ──► data/students/<name>/profile.md
-        ├─► C03 University Profile ──► Playwright scrape ──► Gemini extract ──► data/universities/<name>/profile.md
-        ├─► C04 Guidance Engine  ──► reads C02 + C03 ──► Gemini generate ──► data/students/<name>/<uni>/guidance.md
-        ├─► C05 Essay Advisor    ──► reads C02 + C03 ──► Gemini generate ──► data/students/<name>/<uni>/essays/<slug>.md
-        └─► C06 PDF Exporter     ──► reads any markdown ──► Puppeteer render ──► <same-path>.pdf
+User invokes `ao`
+  └─► src/config/ bootstrap — ensure university-ao/ exists; load university-ao/.env <!-- CHG-002 -->
+        └─► C01 CLI Shell — renders full-screen ink menu; manages navigation state <!-- CHG-002 -->
+              ├─► Config screen ──► read/write university-ao/.env (GEMINI_API_KEY, GEMINI_MODEL) <!-- CHG-002 -->
+              ├─► C02 Student Profile  ──► university-ao/students/<name>/profile.md <!-- CHG-002 -->
+              ├─► C03 University Profile ──► Playwright scrape ──► Gemini extract ──► university-ao/students/<name>/universities/<uni>/profile.md <!-- CHG-002 -->
+              ├─► C04 Guidance Engine  ──► reads C02 + C03 ──► Gemini generate ──► university-ao/students/<name>/universities/<uni>/guidance/<timestamp>/ <!-- CHG-002 -->
+              ├─► C05 Essay Advisor    ──► reads C02 + C03 ──► Gemini generate ──► university-ao/students/<name>/universities/<uni>/essays/<timestamp>/ <!-- CHG-002 -->
+              └─► C06 PDF Exporter     ──► reads any markdown ──► Puppeteer render ──► <same-path>.pdf
 ```
 
 ### 1.2 Component Interaction Map
@@ -69,13 +71,13 @@ User invokes CLI
 
 **Decision 1 — Local-only, file-backed persistence**
 - Context: Student data is sensitive; no cloud requirement exists.
-- Choice: All data stored as markdown files on the local filesystem under `data/`.
+- Choice: All data stored as markdown files on the local filesystem under `university-ao/` (relative to `process.cwd()`). <!-- CHG-002 -->
 - Alternatives rejected: SQLite (overkill), cloud storage (out of scope).
 - Consequences: No sync, no multi-device, no backup — acceptable for MVP.
 
 **Decision 2 — Gemini API for all AI generation**
 - Context: Guidance and essay outputs require natural language reasoning over structured profile data.
-- Choice: Google Gemini API via `@google/generative-ai` SDK; model and key from `.env`.
+- Choice: Google Gemini API via `@google/generative-ai` SDK; model and key stored in `university-ao/.env`. <!-- CHG-002 -->
 - Alternatives rejected: OpenAI (not selected by DevAgent), rule/template engine (insufficient quality).
 - Consequences: Requires internet + valid API key for C03, C04, C05; C01, C02, C06 work offline.
 
@@ -83,7 +85,7 @@ User invokes CLI
 - Context: University websites are predominantly JS-rendered SPAs; static HTML parsers miss dynamic content.
 - Choice: Playwright (headless Chromium) for full DOM rendering before extraction.
 - Alternatives rejected: `cheerio` (fails on JS-rendered content), `scrapy` (Python).
-- Consequences: ~100MB browser binary dependency; slower cold start for `--university-profile --build`.
+- Consequences: ~100MB browser binary dependency; slower cold start for university profile build.
 
 **Decision 4 — TypeScript + ESM**
 - Context: Type safety reduces runtime errors in a CLI with complex data structures; ESM is TypeScript 5.x's natural output target.
@@ -91,11 +93,17 @@ User invokes CLI
 - Alternatives rejected: plain JavaScript (no type safety), CommonJS (legacy, worse ESM interop).
 - Consequences: Requires `tsconfig.json`; all imports use `.js` extensions per NodeNext resolution.
 
-**Decision 5 — Prerequisite enforcement at CLI layer**
-- Context: University profile, guidance, and essay all depend on a student profile with an intended major.
-- Choice: C01 CLI Shell checks for the student profile and intended major before dispatching to C03, C04, or C05. If missing, it stops and prints an actionable message.
-- Alternatives rejected: each component checking independently (redundant, inconsistent messaging).
-- Consequences: Single enforcement point; components may assume prerequisites are met.
+**Decision 5 — Menu-driven UX; no command-line flags** <!-- CHG-002 -->
+- Context: Flag-based CLI was complex and hard to follow; replaced entirely by CHG-002.
+- Choice: `ao` invoked with no arguments renders a full-screen ink TUI menu. `commander` removed. Navigation state managed by C01. Prerequisites enforced structurally by menu flow (Guidance/Essay only reachable after university selected).
+- Alternatives rejected: keeping flags alongside menu (unnecessary complexity).
+- Consequences: No flag parsing; `commander` dependency removed; `enquirer` removed; all interactive prompts go through `tui.tsx` ink helpers.
+
+**Decision 6 — `process.cwd()`-relative workspace** <!-- CHG-002 -->
+- Context: `ao` is a globally installed npm tool; data and config must live in the user's working directory, not the package install location.
+- Choice: On startup, bootstrap in `src/config/` ensures `university-ao/` exists relative to `process.cwd()`. Both `university-ao/.env` and all data paths are resolved from `process.cwd()`.
+- Alternatives rejected: fixed home-directory path (poor multi-project support), package-relative path (breaks global install).
+- Consequences: Each directory where a user runs `ao` gets its own self-contained `university-ao/` workspace.
 
 ---
 
@@ -105,45 +113,45 @@ User invokes CLI
 
 | Field | Detail |
 | :---- | :----- |
-| **Purpose** | Entry point — parses all command-line switches, enforces prerequisites, routes to the correct component, handles `--print` flag |
-| **Ownership boundary** | Routing logic, prerequisite checks, top-level error display |
-| **Dependencies** | C02, C03, C04, C05, C06 |
-| **Key data elements** | CLI arguments, student name, university name |
-| **Services exposed** | `ao` binary / `npx ao` |
+| **Purpose** | Entry point — renders full-screen ink menu, manages session navigation state (selected student, selected university), dispatches to components, offers PDF export prompt after each action <!-- CHG-002 --> |
+| **Ownership boundary** | Menu tree, navigation state, startup dispatch, Config screen (read/write `university-ao/.env`) <!-- CHG-002 --> |
+| **Dependencies** | `src/config/` bootstrap, C02, C03, C04, C05, C06 |
+| **Key data elements** | Navigation state: selected student slug, selected university slug <!-- CHG-002 --> |
+| **Services exposed** | `ao` binary / `npx ao` (no arguments required) <!-- CHG-002 --> |
 | **External services consumed** | None |
 | **Background process** | N |
 | **AI capabilities** | N |
-| **Critical NFRs** | Fast startup; clear help text; actionable error messages |
+| **Critical NFRs** | Fast startup; Back navigation at every step; Guidance/Essay structurally unreachable until university selected <!-- CHG-002 --> |
 | **Component spec path** | `./SPECS/components/c01-cli-shell/` |
 
 ### [C02] Student Profile
 
 | Field | Detail |
 | :---- | :----- |
-| **Purpose** | Interactive wizard to collect and store the student's holistic profile; display stored profile |
-| **Ownership boundary** | Student profile markdown files under `data/students/<name>/` |
-| **Dependencies** | None |
+| **Purpose** | Interactive wizard to collect and store the student's holistic profile; display stored profile; support update and delete <!-- CHG-002 --> |
+| **Ownership boundary** | Student profile files under `university-ao/students/<name>/` <!-- CHG-002 --> |
+| **Dependencies** | `tui.tsx` shared helpers |
 | **Key data elements** | GPA (weighted/unweighted), class rank, transcript, SAT/ACT/AP/IB scores, extracurriculars, awards, intended major/track, personal statement drafts |
-| **Services exposed** | `--student-profile --build`, `--student-profile --show` |
+| **Services exposed** | Build/Update Profile, View Profile, Delete Profile (via menu) <!-- CHG-002 --> |
 | **External services consumed** | None — fully offline |
 | **Background process** | N |
 | **AI capabilities** | N |
-| **Critical NFRs** | Wizard must be resumable if interrupted; existing profile data must not be silently overwritten |
+| **Critical NFRs** | Wizard must be resumable if interrupted; existing profile data must not be silently overwritten; delete requires confirmation |
 | **Component spec path** | `./SPECS/components/c02-student-profile/` |
 
 ### [C03] University Profile
 
 | Field | Detail |
 | :---- | :----- |
-| **Purpose** | Scrapes a university website (given a domain) using Playwright, extracts structured profile data via Gemini, stores as markdown |
-| **Ownership boundary** | University profile markdown files under `data/universities/<name>/` |
-| **Dependencies** | C01 (prerequisite check), Gemini API, Playwright |
+| **Purpose** | Scrapes a university website (given a domain) using Playwright, extracts structured profile data via Gemini, stores as markdown; support update and delete <!-- CHG-002 --> |
+| **Ownership boundary** | University profile files under `university-ao/students/<name>/universities/<uni>/` <!-- CHG-002 --> |
+| **Dependencies** | `tui.tsx` shared helpers, Gemini API, Playwright <!-- CHG-002 --> |
 | **Key data elements** | Core values, culture, academic specialties, ideal candidate traits, notable programs, campus ethos |
-| **Services exposed** | `--university-profile --build`, `--university-profile --show` |
+| **Services exposed** | Add University, View University Profile, Update University, Delete University (via menu) <!-- CHG-002 --> |
 | **External services consumed** | University website (Playwright), Gemini API |
 | **Background process** | N |
 | **AI capabilities** | Y — Gemini extracts and structures scraped content into the university profile schema |
-| **Critical NFRs** | Failed URLs logged to a retry list; graceful degradation if scraping partially succeeds |
+| **Critical NFRs** | Failed URLs logged to a retry list; graceful degradation if scraping partially succeeds; delete requires confirmation |
 | **Component spec path** | `./SPECS/components/c03-university-profile/` |
 
 ### [C04] Guidance Engine
@@ -151,14 +159,14 @@ User invokes CLI
 | Field | Detail |
 | :---- | :----- |
 | **Purpose** | Reads student and university profiles, calls Gemini to generate prescriptive guidance on projecting the student's strengths to align with the university's values |
-| **Ownership boundary** | Guidance report markdown under `data/students/<name>/<uni>/guidance.md` |
-| **Dependencies** | C02 (student profile), C03 (university profile), Gemini API |
+| **Ownership boundary** | Guidance report markdown under `university-ao/students/<name>/universities/<uni>/guidance/<YYYY-MM-DD-HHmm>/` <!-- CHG-002 --> |
+| **Dependencies** | C02 (student profile), C03 (university profile), `tui.tsx` shared helpers, Gemini API <!-- CHG-002 --> |
 | **Key data elements** | Student profile + university profile → guidance recommendations |
-| **Services exposed** | `--guidance --build`, `--guidance --show` |
+| **Services exposed** | Generate Guidance, View Guidance (select from dated list) (via menu) <!-- CHG-002 --> |
 | **External services consumed** | Gemini API |
 | **Background process** | N |
 | **AI capabilities** | Y — Gemini generates all guidance content |
-| **Critical NFRs** | Output must be anchored to actual student profile data; no generic advice |
+| **Critical NFRs** | Output must be anchored to actual student profile data; no generic advice; multiple dated outputs supported per student+university pair |
 | **Component spec path** | `./SPECS/components/c04-guidance-engine/` |
 
 ### [C05] Essay Advisor
@@ -166,25 +174,25 @@ User invokes CLI
 | Field | Detail |
 | :---- | :----- |
 | **Purpose** | Accepts a user-provided essay prompt and university name; generates a structured outline plus inspiration samples drawn from the student's actual profile |
-| **Ownership boundary** | Essay markdown files under `data/students/<name>/<uni>/essays/` |
-| **Dependencies** | C02 (student profile), C03 (university profile), Gemini API |
+| **Ownership boundary** | Essay markdown files under `university-ao/students/<name>/universities/<uni>/essays/<YYYY-MM-DD-HHmm>/` <!-- CHG-002 --> |
+| **Dependencies** | C02 (student profile), C03 (university profile), `tui.tsx` shared helpers, Gemini API <!-- CHG-002 --> |
 | **Key data elements** | Essay prompt (user-provided), student profile, university profile → outline + samples |
-| **Services exposed** | `--essay --build`, `--essay --show` |
+| **Services exposed** | Draft Essay, View Essay (select from dated list) (via menu) <!-- CHG-002 --> |
 | **External services consumed** | Gemini API |
 | **Background process** | N |
 | **AI capabilities** | Y — Gemini generates outline and inspiration samples |
-| **Critical NFRs** | Samples clearly marked as inspirational; one prompt per invocation; covers personal statement and supplemental essays |
+| **Critical NFRs** | Samples clearly marked as inspirational; one prompt per invocation; covers personal statement and supplemental essays; multiple dated outputs supported per student+university pair |
 | **Component spec path** | `./SPECS/components/c05-essay-advisor/` |
 
 ### [C06] PDF Exporter
 
 | Field | Detail |
 | :---- | :----- |
-| **Purpose** | Converts any `ao` markdown output to a formatted PDF when `--print` is passed |
+| **Purpose** | Converts any `ao` markdown output to a formatted PDF; invoked via follow-up prompt after any view or generate action <!-- CHG-002 --> |
 | **Ownership boundary** | PDF files written alongside their source markdown |
 | **Dependencies** | Puppeteer, `marked` |
 | **Key data elements** | Source markdown path → PDF output path |
-| **Services exposed** | `--print` flag (composable with all four primary commands) |
+| **Services exposed** | PDF export prompt (offered by C01 after any view/generate action) <!-- CHG-002 --> |
 | **External services consumed** | None — fully offline |
 | **Background process** | N |
 | **AI capabilities** | N |
@@ -201,13 +209,13 @@ User invokes CLI
 | :---- | :--------- | :-------- | :---------- |
 | **Language** | TypeScript 5.x (ESM, NodeNext) | Type safety; natural ESM output | `./src/` |
 | **Runtime** | Node.js 20 LTS | LTS stability; ESM support | — |
-| **CLI framework** | `commander` | Mature, well-typed, supports subcommands and flags | `./src/cli/` |
-| **Wizard / prompts** | `enquirer` | Richer prompt types (multi-select, scales); clean ESM support | `./src/components/` |
+| **TUI framework** | `ink` v5.x + `@inkjs/ui` | Full-screen React-based terminal UI; ESM-native; de facto standard for rich Node.js CLIs; replaces `commander` and `enquirer` entirely <!-- CHG-002 --> | `./src/components/`, `./src/utils/tui.tsx` |
+| **Shared TUI helpers** | `src/utils/tui.tsx` | Single shared module for all interactive prompts (SpaciousSelect, waitForText, waitForConfirm) across all components <!-- CHG-002 --> | `./src/utils/` |
 | **Web scraping** | `playwright` (headless Chromium) | Full DOM rendering for JS-heavy university sites | `./src/components/c03-university-profile/` |
 | **AI SDK** | `@google/generative-ai` | Official Gemini SDK | `./src/ai/` |
 | **PDF export** | `puppeteer` | HTML→PDF rendering; no external service needed | `./src/components/c06-pdf-exporter/` |
 | **Markdown → HTML** | `marked` | Converts markdown to HTML for PDF pipeline | `./src/components/c06-pdf-exporter/` |
-| **Env / config** | `dotenv` | Loads `GEMINI_API_KEY` + `GEMINI_MODEL` from `.env` | `./src/config/` |
+| **Env / config** | `dotenv` | Loads `GEMINI_API_KEY` + `GEMINI_MODEL` from `university-ao/.env`; config screen writes back to same file <!-- CHG-002 --> | `./src/config/` |
 | **File I/O** | Node.js built-in `fs/promises`, `path` | Read/write markdown files | `./src/utils/` |
 
 > 🔽 **Deferred to Detailed Design:** Version pinning rationale, per-component additional library proposals (proposed in component spec, approved via `D_Decisions.md`).
@@ -240,25 +248,22 @@ User invokes CLI
 
 | Flow | Entry point | Success exit | Owner component |
 | :--- | :---------- | :----------- | :-------------- |
-| Build student profile | `ao --student-profile --build` | Profile saved to `data/students/<name>/profile.md` | C02 |
-| Show student profile | `ao --student-profile --show --name <name>` | Profile printed to stdout | C02 |
-| Build university profile | `ao --university-profile --build --domain <domain>` | Profile saved to `data/universities/<name>/profile.md` | C03 |
-| Show university profile | `ao --university-profile --show --name <name>` | Profile printed to stdout | C03 |
-| Build guidance report | `ao --guidance --build --student <name> --university <name>` | Report saved to `data/students/<name>/<uni>/guidance.md` | C04 |
-| Show guidance report | `ao --guidance --show --student <name> --university <name>` | Report printed to stdout | C04 |
-| Build essay outline | `ao --essay --build --student <name> --university <name>` | Outline saved to `data/students/<name>/<uni>/essays/<slug>.md` | C05 |
-| Show essay outline | `ao --essay --show --student <name> --university <name>` | Outline printed to stdout | C05 |
-| Export to PDF | Any `--build` or `--show` + `--print` | PDF written alongside source markdown | C06 |
+| App startup | `ao` (no args) | Menu rendered; `university-ao/` ensured; `.env` loaded | C01 + `src/config/` |
+| Configure API key/model | Config option at student select screen | `university-ao/.env` updated | C01 |
+| Create student | "New Student" at student select | Profile wizard complete; student dir created | C02 |
+| Update student profile | "Update Profile" at student context | Profile wizard re-run; data merged | C02 |
+| Delete student profile | "Delete Profile" at student context (confirmed) | Student dir removed | C02 |
+| Add university | "New University" at university select | Domain prompted; scrape+extract complete; university dir created | C03 |
+| Update university profile | "Update University" at university context | Re-scrape+extract; profile updated | C03 |
+| Delete university profile | "Delete University" at university context (confirmed) | University dir removed | C03 |
+| Generate guidance | "Guidance" → "New" at action screen | Guidance saved to dated dir; PDF prompt offered | C04 |
+| View guidance | "Guidance" → select dated entry | Guidance printed; PDF prompt offered | C04 |
+| Draft essay | "Essay" → "New" at action screen | Essay saved to dated dir; PDF prompt offered | C05 |
+| View essay | "Essay" → select dated entry | Essay printed; PDF prompt offered | C05 |
+| Export to PDF | PDF prompt after any view/generate | PDF written alongside source markdown | C06 |
+| Back navigation | "Back" at any step | Returns to previous screen | C01 |
 
-### 5.3 Mandatory Lenses
-
-| Lens | Applicable? | Rationale |
-| :--- | :---------- | :-------- |
-| Mobile-first | N | CLI tool; no mobile surface |
-| Cloud-first | N | Fully local; no cloud dependency |
-| AI-first | Y | Gemini drives all guidance, extraction, and essay generation |
-
-> 🔽 **Deferred to Detailed Design:** Exact CLI flag signatures, wizard question sequences, output formatting, and per-flow error paths.
+> 🔽 **Deferred to Detailed Design:** Per-screen layout, ink component tree, wizard question sequences, output formatting, and per-flow error paths.
 
 ---
 
@@ -268,11 +273,10 @@ User invokes CLI
 
 ```
 Student (1) ──< StudentProfile (1)
-Student (1) ──< GuidanceReport (many — one per university)
-Student (1) ──< EssayOutline (many — one per prompt per university)
+Student (1) ──< University (many) <!-- CHG-002 — universities nested under student -->
 University (1) ──< UniversityProfile (1)
-GuidanceReport >── University (1)
-EssayOutline >── University (1)
+University (1) ──< GuidanceReport (many — one per dated run) <!-- CHG-002 -->
+University (1) ──< EssayOutline (many — one per dated run) <!-- CHG-002 -->
 ```
 
 ### 6.2 Storage Strategy
@@ -297,21 +301,25 @@ No database, cache, vector store, or queue is used.
 ### 6.4 Directory Structure
 
 ```
-data/
+university-ao/                          ← workspace root (process.cwd()/university-ao/) <!-- CHG-002 -->
+  .env                                  ← GEMINI_API_KEY, GEMINI_MODEL (read/write via Config menu) <!-- CHG-002 -->
   students/
-    <student-name>/
-      profile.md
-      <university-name>/
-        guidance.md
-        essays/
-          <prompt-slug>.md
-  universities/
-    <university-name>/
-      profile.md
-      failed-urls.md        ← scraping retry list (C03)
+    <student-slug>/
+      profile.json                      ← raw wizard data (C02)
+      profile.md                        ← rendered markdown (C02)
+      universities/                     ← all university data nested under student <!-- CHG-002 -->
+        <university-slug>/
+          profile.md                    ← university profile (C03)
+          failed-urls.md                ← scraping retry list (C03)
+          guidance/
+            <YYYY-MM-DD-HHmm>/          ← one dir per dated run <!-- CHG-002 -->
+              guidance.md
+          essays/
+            <YYYY-MM-DD-HHmm>/          ← one dir per dated run <!-- CHG-002 -->
+              essay.md
 ```
 
-> 🔽 **Deferred to Detailed Design:** Field-level markdown schema for each entity, naming conventions for slugs, failed-url list format.
+> 🔽 **Deferred to Detailed Design:** Field-level markdown schema for each entity, slug naming conventions, failed-url list format.
 
 ---
 
@@ -329,7 +337,7 @@ data/
 
 ### 7.2 Versioning Strategy
 
-Not applicable — no external API surface. CLI flag compatibility governed by `package.json` semver.
+Not applicable — no external API surface. Semver governed by `package.json`; menu navigation contract is internal. <!-- CHG-002 -->
 
 > 🔽 **Deferred to Detailed Design:** Gemini request envelope (system prompt, user prompt structure, parameters) — resolved per component in component specs.
 
@@ -348,7 +356,7 @@ All external calls (Gemini API, Playwright scraping) use **retry-once with a 30-
 | Transient | Network timeout, Gemini rate limit, Playwright navigation timeout | Once after 30s delay (shown to user) | "Retrying in 30 seconds..." |
 | Permanent | Missing API key, invalid input, file not found, 404 | N | Plain-English message + next step |
 | Scraping failure | Bot-blocked, JS error, unreachable URL | N (added to retry list) | URL logged to `failed-urls.md`; message shown |
-| User-caused | Missing prerequisite (no student profile), bad flag | N | Actionable instruction printed |
+| User-caused | Missing prerequisite (no student profile), no university selected | N | Actionable instruction shown in menu <!-- CHG-002 --> |
 
 ### 8.3 User-Facing Error Tone
 
@@ -366,8 +374,8 @@ Plain English. Always actionable. Never expose internal error codes, stack trace
 | :------ | :----- |
 | Mechanism | API key (Gemini) |
 | Provider | Google (Gemini API) |
-| Key storage | `.env` file in project root, loaded via `dotenv` |
-| Intentionally public surfaces | All CLI commands (single-user local tool) |
+| Key storage | `university-ao/.env`, read/write via Config menu <!-- CHG-002 --> |
+| Intentionally public surfaces | All menu options (single-user local tool) <!-- CHG-002 --> |
 
 ### 9.2 Authorization
 
@@ -384,10 +392,10 @@ Not applicable — single-user local tool with no roles or permissions.
 
 | Concern | Detail |
 | :------ | :----- |
-| Secret store | `.env` file in project root |
+| Secret store | `university-ao/.env` (relative to `process.cwd()`) <!-- CHG-002 --> |
 | No secrets in source / logs | Confirmed — `GEMINI_API_KEY` must never appear in stdout, stderr, or any output file |
-| `.env` gitignored | Confirmed — `.gitignore` must include `.env` |
-| Rotation policy | User's responsibility — replace value in `.env` |
+| `.env` gitignored | Confirmed — `.gitignore` must include `university-ao/.env` <!-- CHG-002 --> |
+| Rotation policy | User replaces value via Config menu or edits file directly <!-- CHG-002 --> |
 
 > 🔽 **Deferred to Detailed Design:** Per-component `.env` key validation and error messaging on missing/malformed keys.
 
@@ -433,8 +441,8 @@ Not applicable.
 
 | Concern | Detail |
 | :------ | :----- |
-| Package | npm package (`ao`) |
-| Invocation | `npx ao <flags>` or `npm install -g ao` then `ao <flags>` |
+| Package | npm package (`university-admission-officer`) <!-- CHG-002 — confirm package name --> |
+| Invocation | `npx university-admission-officer` or `npm install -g university-admission-officer` then `ao` (no arguments) <!-- CHG-002 --> |
 | Runtime requirement | Node.js 20 LTS |
 | Environment matrix | Single: local developer machine |
 | CI/CD | None for MVP — publish to npm manually |
@@ -471,21 +479,21 @@ Not applicable. `ao` is a single-user local CLI. There is no concurrent load, no
 
 ```
 src/
-  cli/              ← commander setup, flag parsing, routing (C01)
   components/
+    c01-cli-shell/      ← ink menu entry point, navigation state (C01) <!-- CHG-002 -->
     c02-student-profile/
     c03-university-profile/
     c04-guidance-engine/
     c05-essay-advisor/
     c06-pdf-exporter/
   ai/
-    prompts/        ← one .md file per Gemini prompt, named <component>-<purpose>.md
-  config/           ← dotenv loader, typed config object
-  utils/            ← shared file I/O helpers, slug utilities
-data/               ← runtime data (gitignored)
+    prompts/            ← one .md file per Gemini prompt, named <component>-<purpose>.md
+  config/               ← startup bootstrap (ensure university-ao/, load .env), typed config object <!-- CHG-002 -->
+  utils/                ← shared file I/O helpers, slug utilities, tui.tsx <!-- CHG-002 -->
+university-ao/          ← runtime workspace (process.cwd()-relative, gitignored) <!-- CHG-002 -->
+  .env
   students/
-  universities/
-dist/               ← compiled JS output (gitignored)
+dist/                   ← compiled JS output (gitignored)
 ```
 
 ### 14.3 Branching Strategy
@@ -517,7 +525,7 @@ No automated testing required for MVP.
 A component is `Complete` when **all** of the following are true:
 - [ ] Implementation matches the component spec
 - [ ] TypeScript compiles with zero errors (`tsc --noEmit`)
-- [ ] All CLI flags for this component work end-to-end
+- [ ] All menu paths for this component navigate and execute correctly end-to-end <!-- CHG-002 -->
 - [ ] No secrets, PII, or hardcoded config values in source
 - [ ] `STATUS.md` Component Status Tracker updated to `Complete`
 
@@ -528,3 +536,4 @@ A component is `Complete` when **all** of the following are true:
 | ID | Description | Date | Author |
 | :- | :---------- | :--: | :----- |
 | CHG-001 | Initial architecture document created during Planning | 2026-05-24 | SpecGantry |
+| CHG-002 | Menu-driven UX overhaul: removed `commander` and `enquirer`; added ink/tui.tsx as sole TUI layer; C01 moved to `src/components/`; `src/cli/` removed; `data/` → `university-ao/` (process.cwd()-relative); universities nested under students; dated guidance/essay dirs; Config screen for `.env`; `src/config/` bootstrap; updated DoD, data flow, all component tables, security, deployment | 2026-05-27 | SpecGantry |

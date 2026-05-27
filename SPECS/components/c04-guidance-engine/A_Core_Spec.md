@@ -1,5 +1,7 @@
 # C04 — Guidance Engine: Core Specification
 
+> ⚠️ Revised 2026-05-27 (CHG-002): Data paths changed to `university-ao/students/<s>/universities/<u>/guidance/<YYYY-MM-DD-HHmm>/guidance.md`. Multiple dated outputs supported. New function signatures: `buildGuidance` returns `timestamp`; `showGuidance` and `listGuidance` added. All paths via `C07.workspacePath()`.
+
 ## Purpose
 
 Reads the student's profile and a university's profile, then calls Gemini to generate a prescriptive, student-specific guidance report. The report tells the student how to project their existing strengths in a way that resonates with what the university values — maximising selection chances. Fully anchored to actual profile data; no generic advice.
@@ -10,10 +12,11 @@ Reads the student's profile and a university's profile, then calls Gemini to gen
 
 | Status | ID | Description | Priority | Req Ref | Doc Level |
 | :----- | :- | :---------- | :------- | :------ | :-------- |
-| `Complete` | C04-F01 | Load and validate student profile and university profile from filesystem before generation | P1 | REQ-0007 | - |
-| `Complete` | C04-F02 | Call Gemini with both profiles to generate a prescriptive, student-anchored guidance report | P1 | REQ-0007 | - |
-| `Complete` | C04-F03 | Store the guidance report as markdown at the canonical path | P1 | REQ-0007, REQ-0013 | - |
-| `Complete` | C04-F04 | Display the stored guidance report markdown to stdout | P1 | REQ-0008 | - |
+| `Not Started` | C04-F01 | Load and validate student profile and university profile from filesystem before generation | P1 | REQ-0007 | - |
+| `Not Started` | C04-F02 | Call Gemini with both profiles to generate a prescriptive, student-anchored guidance report | P1 | REQ-0007 | - |
+| `Not Started` | C04-F03 | Store the guidance report as markdown in a dated subdirectory | P1 | REQ-0007, REQ-0013, REQ-0019 | - |
+| `Not Started` | C04-F04 | Display a stored guidance report markdown to stdout | P1 | REQ-0008 | - |
+| `Not Started` | C04-F05 | List all dated guidance directories for a student+university pair | P1 | REQ-0019 | - |
 
 ---
 
@@ -76,16 +79,19 @@ Concrete tips specific to this university's culture, programs, or application pr
 ## Data Flows
 
 **F01 — Load & validate:**
-`studentName + universityName → resolve data/students/<slug>/profile.md → read → resolve data/universities/<uniSlug>/profile.md → read → both present? → proceed → else: print error + exit(1)`
+`studentSlug + uniSlug → resolve workspacePath('students', s, 'profile.md') → read → resolve workspacePath('students', s, 'universities', u, 'profile.md') → read → both present? → proceed → else: print error + exit(1)`
 
 **F02 — Generate via Gemini:**
 `studentProfileText + universityProfileText → [load prompt from src/ai/prompts/c04-guidance-generate.md] → [inject profile content into prompt] → [call Gemini generateContent async] → guidanceMarkdown string`
 
 **F03 — Store:**
-`guidanceMarkdown → ensure dir data/students/<slug>/<uniSlug>/ exists → fs.writeFile(guidance.md) → return { reportPath }`
+`guidanceMarkdown + timestamp → ensure dir workspacePath('students', s, 'universities', u, 'guidance', timestamp) → fs.writeFile('guidance.md') → return { reportPath, timestamp }`
 
 **F04 — Show:**
-`studentName + universityName → resolve data/students/<slug>/<uniSlug>/guidance.md → read → print to stdout → return { markdownPath }`
+`studentSlug + uniSlug + timestamp → resolve workspacePath('students', s, 'universities', u, 'guidance', timestamp, 'guidance.md') → read → print to stdout → return { markdownPath }`
+
+**F05 — List:**
+`studentSlug + uniSlug → fs.readdir(workspacePath('students', s, 'universities', u, 'guidance')) → return sorted string[] of timestamps (newest first) → empty array if dir doesn't exist`
 
 ---
 

@@ -12,13 +12,14 @@
 - Do not infer missing details — raise as a spec gap.
 
 ## Key Facts for Developers
-- C02 uses **`ink` + `@inkjs/ui`** for all interactive menus — `enquirer` is NOT used in C02. Each screen is a `render()` call that resolves a promise on user action.
-- C02 is **fully offline** (except the Gemini enhancement at Finalize & Save) — no Playwright, no unnecessary network calls.
-- The **directory slug** is always computed by C01 and passed in. C02 never sanitises names itself.
+- C02 uses **`ink` + `@inkjs/ui`** for all interactive menus — `enquirer` is NOT used in C02.
+- C02 is **fully offline** (except the Gemini enhancement at Finalize & Save).
+- The **directory slug** is always computed and passed in by C01. C02 never sanitises names itself.
+- All file paths use **`C07.workspacePath()`** — never `dataPath()` or hardcoded `data/` paths.
 - The **update flow** (C02-F02) must merge — never overwrite untouched sections.
-- `intendedMajors` is the **critical prerequisite field** — it must always be written even if the student updates only one section.
+- `intendedMajors` is the **critical prerequisite field** — must always be written.
 - The markdown schema in `B_Interfaces.md` is the **authoritative output format** — C04 and C05 read this file directly.
-- The `ProfileScreen` shared layout component must be used on every screen — it owns the three-zone (header/content/footer) full-screen layout defined in `C_Operational_Specs.md`.
+- **Delete** (C02-F08) is called by C01 after confirmation — C02 just removes the directory, no prompting.
 
 ## Spec Version
-Last updated: 2026-05-25 | Status: Ready (Revised — ink UX)
+Last updated: 2026-05-27 | Status: Ready (CHG-002)

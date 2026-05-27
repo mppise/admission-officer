@@ -151,7 +151,7 @@ Field Edit (Level 3 — list):
    On failure (after 1 retry): use raw ProfileData; print warning:
    "Profile enhancement unavailable — saved with original text."
 7. renderProfileMarkdown(data) → write profile.md
-8. Print: "Profile saved: data/students/<slug>/profile.md"
+8. Print: "Profile saved: university-ao/students/<slug>/profile.md"
 ```
 
 ### C02-F05-JSON — Incremental Save
@@ -159,7 +159,7 @@ Field Edit (Level 3 — list):
 ```
 1. Triggered after every individual field input (scalar or list sub-field)
 2. Serialize full ProfileData + fieldStatus → JSON.stringify(data, null, 2)
-3. Write to data/students/<slug>/profile.json
+3. Write to university-ao/students/<slug>/profile.json
 4. Silent on success
 5. Throw on failure — propagates to error handler
 ```
@@ -167,7 +167,7 @@ Field Edit (Level 3 — list):
 ### C02-F03 — Show Flow
 
 ```
-1. Resolve path: data/students/<slug>/profile.md
+1. Resolve path: university-ao/students/<slug>/profile.md
 2. If not found: print error + exit(1)
 3. Print full markdown content to stdout
 ```
@@ -266,7 +266,7 @@ No regulatory obligations apply. All data stored locally.
 | Field saved | Silent — no console output (avoids noise during menu navigation) |
 | Enhancement start | `Enhancing your profile...` to stdout |
 | Enhancement skipped | `Profile enhancement unavailable — saved with original text.` to stdout |
-| Finalize success | `Profile saved: data/students/<slug>/profile.md` to stdout |
+| Finalize success | `Profile saved: university-ao/students/<slug>/profile.md` to stdout |
 | File not found | Error to stderr with corrective action |
 | Write failure | Error to stderr with plain reason |
 

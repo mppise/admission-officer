@@ -1,92 +1,151 @@
 # C01 — CLI Shell: Operational Specifications
 
+> ⚠️ Revised 2026-05-27 (CHG-002): Full rewrite of all operational specs to reflect menu-driven UX, removal of flags, and new Config/delete/navigation features.
+
 ## Error Handling
 
 | Feature | Error Class | Retries | Backoff | Fallback |
 | :------ | :---------- | :------ | :------ | :------- |
-| C01-F02 `.env` validation | Permanent | 0 | — | Print missing key name + exit(1) |
-| C01-F03 Prerequisite check | Permanent (user-caused) | 0 | — | Print actionable message + exit(1) |
-| C01-F01 Component dispatch | Propagated from component | Per component spec | Per component spec | Re-surface component error to stderr + exit(1) |
-| C01-F04 `--print` composition | Permanent (file not found) | 0 | — | Print `PDF export failed: <path> not found` + exit(1) |
+| C01-F01 bootstrap | Permanent (filesystem) | 0 | — | Warn to stderr; continue — missing workspace surfaces later |
+| C01-F03 Config save | Permanent (validation) | 0 | — | Display `ConfigValidationError` message inline in Config screen; stay on screen |
+| C01-F03 Config save | Permanent (filesystem) | 0 | — | Display error message inline; stay on screen |
+| C01-F06/F07 dispatch to C04/C05 | Transient (Gemini/network) | Delegated to C04/C05 | Per C04/C05 spec | C04/C05 surfaces error; C01 returns to University Context screen |
+| C01-F08 PDF export | Permanent (file not found) | 0 | — | Display `PDF export failed: <message>`; offer to skip and return |
+| C01-F10 Delete | Permanent (filesystem) | 0 | — | Display error; return to context screen without deleting |
+| Any unhandled | Permanent | 0 | — | Print `Something went wrong: <message>` to stderr; exit(1) |
 
-C01 never retries at its own layer. Retry logic lives in the components that make external calls (C03, C04, C05).
+C01 never retries at its own layer. Retry logic lives in C03, C04, C05.
 
 ---
 
 ## UX Detail
 
-### Help Text
-
-`ao --help` must display a concise command reference. `commander` generates this automatically from flag definitions. No custom help page needed beyond well-named flags and descriptions.
-
-### Prerequisite Error Messages
-
-Messages must be plain English with a concrete corrective action:
+### Config Screen
 
 ```
-No student profile found for "john-doe".
-Run: ao --student-profile --build --name john-doe
+╔══════════════════════════════════════════════════════════════╗
+║  ao — Admissions Officer                                     ║
+║  Configuration                                               ║
+╚══════════════════════════════════════════════════════════════╝
+
+  Gemini API Key:    ••••••••••••••••••••••1234  (last 4 shown)
+  Gemini Model:      gemini-1.5-pro
+
+  ▶  Edit API Key
+     Edit Model
+     ─────────────
+     Save & Return
+     Cancel
+
+  ↑↓ navigate · Enter select
 ```
 
+- API key masked: show only last 4 characters; replace rest with `•`.
+- If key is not set, show `(not configured)`.
+- "Edit API Key" and "Edit Model" open inline text input using `waitForText`.
+- "Save & Return" calls `C07.saveConfig()` then returns to Student Select.
+- Validation error shown as a red inline message above the menu if key or model is empty.
+
+### Delete Confirmation Screen
+
 ```
-Student profile for "john-doe" is missing an intended major.
-Run: ao --student-profile --build --name john-doe to update your profile.
+╔══════════════════════════════════════════════════════════════╗
+║  ao — Admissions Officer                                     ║
+║  Delete Student Profile                                      ║
+╚══════════════════════════════════════════════════════════════╝
+
+  Delete "jane-smith"? This cannot be undone.
+
+  ▶  Yes, delete permanently
+     No, go back
+
+  ↑↓ navigate · Enter select
 ```
 
-### .env Error Messages
+Same pattern for "Delete University".
+
+### New University Domain Prompt
 
 ```
-Missing required configuration: GEMINI_API_KEY
-Add it to your .env file in the project root.
+╔══════════════════════════════════════════════════════════════╗
+║  ao — Admissions Officer                                     ║
+║  Add University                                              ║
+╚══════════════════════════════════════════════════════════════╝
 
-Missing required configuration: GEMINI_MODEL
-Add it to your .env file. Example: GEMINI_MODEL=gemini-1.5-pro
+  Enter university domain (e.g., mit.edu):  █
+
+  ↑↓ navigate · Enter confirm · Esc back
 ```
 
-### Progress Output
+### Dated Entry Lists
 
-Each operation prints a single status line before dispatching:
+Guidance and Essay lists show entries in reverse chronological order (newest first). Display format for dated dirs: `YYYY-MM-DD HH:mm` (rendered from `YYYY-MM-DD-HHmm` directory name).
+
 ```
-Building student profile...
-Scraping university website...
-Generating guidance report...
-Generating essay outline...
-Exporting to PDF...
+  ▶  2026-05-27 14:30  (latest)
+     2026-05-26 09:15
+     ─────────────────
+     New Guidance
+     Back
+```
+
+### PDF Prompt
+
+Rendered inline after content is displayed:
+
+```
+  Export this to PDF?
+
+  ▶  Yes — Save as PDF
+     No — Return to menu
 ```
 
 ---
 
 ## Data Specifics
 
-C01 reads but never writes data files. It reads only:
-- `data/students/<name>/profile.md` — to check prerequisite existence and `intendedMajor` field
-- Resolved paths returned from component handlers — passed to C06 for `--print`
+### Name Sanitisation (C01 responsibility)
 
-### Name Sanitisation
-
-Student and university names are sanitised before use as directory paths:
+C01 sanitises all user-supplied names before passing as slugs to components:
 
 | Rule | Example |
 | :--- | :------ |
 | Lowercase | `John Doe` → `john doe` |
 | Spaces to hyphens | `john doe` → `john-doe` |
-| Strip special characters | `MIT!` → `mit` |
-| Domain to name (university) | `mit.edu` → `mit` |
+| Strip non-alphanumeric (except hyphens) | `MIT!` → `mit` |
+| Domain to slug | `mit.edu` → `mit` |
+| Collapse multiple hyphens | `--` → `-` |
+| Trim leading/trailing hyphens | `-mit-` → `mit` |
+
+### Timestamp Generation
+
+Dated directory names use `YYYY-MM-DD-HHmm` format:
+
+```typescript
+const now = new Date();
+const timestamp = now.getFullYear()
+  + '-' + String(now.getMonth() + 1).padStart(2, '0')
+  + '-' + String(now.getDate()).padStart(2, '0')
+  + '-' + String(now.getHours()).padStart(2, '0')
+  + String(now.getMinutes()).padStart(2, '0');
+```
+
+C01 generates the timestamp and passes it to C04/C05 so both the directory name and the returned path are consistent.
 
 ---
 
 ## Security Detail
 
-- `GEMINI_API_KEY` must never be logged, printed, or included in any error message.
-- `GEMINI_MODEL` is safe to include in debug output.
-- Name sanitisation (above) prevents path traversal — no `../` or absolute path injection possible after sanitisation.
+- `GEMINI_API_KEY` must never be printed in full. Config screen shows only last 4 chars masked.
 - No user-supplied input is passed to `exec`, `spawn`, or `eval`.
+- Name sanitisation prevents path traversal — no `../` possible after slug conversion.
+- `fs.rm(dir, { recursive: true })` for delete is gated behind explicit confirmation — no accidental deletion.
 
 ---
 
 ## Compliance Obligations
 
-Not applicable. C01 does not handle PII directly. Student name used as directory slug only — not stored as an identifier.
+Not applicable. C01 handles only navigation state and slug-based paths — no PII stored or transmitted by C01 itself.
 
 ---
 
@@ -94,29 +153,22 @@ Not applicable. C01 does not handle PII directly. Student name used as directory
 
 | Signal | Detail |
 | :----- | :----- |
-| Progress | One-line stdout per operation start |
-| Success | `Saved: <path>` or `PDF exported: <path>` to stdout |
-| Error | Plain-English message to stderr |
-| Exit code | 0 on success, 1 on any error |
-
-No SLO targets. No alerting. No analytics. Single-user local CLI.
+| Bootstrap warning | `[ao] Warning: ...` → stderr |
+| Operation success | Inline ink screen message |
+| Error | Inline ink screen message or stderr |
+| Exit code | 0 on clean exit, 1 on unhandled error |
 
 ---
 
 ## Infrastructure / Environment Variables
 
-| Name | Purpose | Source |
-| :--- | :------ | :----- |
-| `GEMINI_API_KEY` | Authenticates requests to Gemini API | `.env` file |
-| `GEMINI_MODEL` | Specifies which Gemini model to use | `.env` file |
-
-Both are loaded via `dotenv.config()` at process start in `src/config/env.ts`. C01 checks their presence before dispatching any AI-dependent command. Values are never echoed.
+C01 itself reads no environment variables directly. It uses `C07.getApiKey()` and `C07.getModel()` accessors. All env loading is C07's responsibility.
 
 ---
 
 ## AI Behavior
 
-C01 itself makes no AI calls. It only validates that the required config for AI-dependent components is present before dispatching to them.
+C01 makes no AI calls. It checks `getApiKey()` is present before dispatching to C03/C04/C05 — if missing, it shows an inline prompt directing the user to the Config screen.
 
 ---
 
@@ -128,10 +180,10 @@ No automated testing required for MVP.
 
 ## Notifications
 
-Not applicable. C01 is a CLI — all output is to stdout/stderr.
+Not applicable. All output is to the terminal via ink.
 
 ---
 
 ## Scalability
 
-Not applicable. Single-user CLI; no concurrent load.
+Not applicable. Single-user CLI.

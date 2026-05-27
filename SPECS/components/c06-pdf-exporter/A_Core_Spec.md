@@ -1,5 +1,7 @@
 # C06 — PDF Exporter: Core Specification
 
+> ⚠️ Revised 2026-05-27 (CHG-002): Invocation model changed — C06 is now triggered by a follow-up "Export to PDF?" prompt shown by C01 after any view or generate action, not by a `--print` flag. All data paths updated to `university-ao/`. All paths via `C07.workspacePath()`.
+
 ## Purpose
 
 Converts any `ao` markdown output file to a well-formatted PDF by rendering it through an HTML template with a clean CSS stylesheet via Puppeteer. The PDF is written alongside the source markdown file with the same name and a `.pdf` extension. Fully offline — no external service calls.
@@ -10,8 +12,8 @@ Converts any `ao` markdown output file to a well-formatted PDF by rendering it t
 
 | Status | ID | Description | Priority | Req Ref | Doc Level |
 | :----- | :- | :---------- | :------- | :------ | :-------- |
-| `Complete` | C06-F01 | Convert a markdown file to HTML using `marked` and a CSS stylesheet | P1 | REQ-0012 | - |
-| `Complete` | C06-F02 | Render the HTML to PDF using Puppeteer and write it alongside the source markdown | P1 | REQ-0012 | - |
+| `Not Started` | C06-F01 | Convert a markdown file to HTML using `marked` and a CSS stylesheet | P1 | REQ-0012 | - |
+| `Not Started` | C06-F02 | Render the HTML to PDF using Puppeteer and write it alongside the source markdown | P1 | REQ-0012 | - |
 
 ---
 
@@ -32,8 +34,8 @@ markdownPath
 ### Output Path Derivation
 
 ```
-markdownPath: data/students/john-doe/profile.md
-pdfPath:      data/students/john-doe/profile.pdf
+markdownPath: university-ao/students/john-doe/profile.md
+pdfPath:      university-ao/students/john-doe/profile.pdf
 ```
 
 Replace `.md` extension with `.pdf` — same directory, same base name.
@@ -117,4 +119,4 @@ await page.pdf({
 
 ## Execution Mode
 
-Request-driven. Invoked by C01 after a `--build` or `--show` command completes when `--print` flag is set. Async — Puppeteer launch and PDF render are both async/await. Process completes synchronously from C01's perspective via top-level await.
+Request-driven. Invoked by C01 after displaying any markdown output (guidance report, essay outline, student profile, university profile) when the user selects "Export to PDF?" from the follow-up prompt. Async — Puppeteer launch and PDF render are both async/await. Process completes synchronously from C01's perspective via top-level await.

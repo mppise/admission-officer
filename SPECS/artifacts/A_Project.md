@@ -37,7 +37,9 @@ High school students applying to college face an opaque, unguided process. They 
 3. **Guidance Engine** — matches the student profile against the university profile and produces prescriptive guidance on how the student can project their existing strengths to resonate with what that university values, maximizing selection chances.
 4. **Essay Advisor** — takes a user-provided essay prompt and generates a structured outline plus inspiration samples drawn from the student's actual profile, covering personal statements and supplemental essays.
 
-All outputs are stored as markdown and can be exported to PDF via `--print`.
+All outputs are stored as markdown and can be exported to PDF via the menu. <!-- CHG-002 -->
+
+The tool is operated exclusively through a full-screen interactive menu — no command-line flags. Running `ao` with no arguments enters the menu immediately. <!-- CHG-002 -->
 
 ---
 
@@ -60,20 +62,27 @@ High school students who are self-managing their college application process and
 
 | ID | Requirement | Priority | Status |
 | :- | :---------- | :------- | :----- |
-| REQ-0001 | Interactive wizard (`--student-profile --build`) to collect and store student profile as markdown | P1 | Active |
+| REQ-0001 | Interactive wizard to collect and store student profile as markdown | P1 | Active |
 | REQ-0002 | Student profile fields: GPA (weighted + unweighted), class rank, transcript (courses + grades by year), SAT/ACT scores, AP/IB scores, extracurriculars (with roles + duration), awards & recognitions, intended major / academic track, personal statement drafts (optional) | P1 | Active |
-| REQ-0003 | Display stored student profile (`--student-profile --show`) | P1 | Active |
-| REQ-0004 | Enforce prerequisite: if student profile does not exist or lacks intended major, `--university-profile --build` must stop and prompt user to build/complete the student profile first | P1 | Active |
-| REQ-0005 | University profile builder (`--university-profile --build`) accepts a domain, scrapes the university website, and extracts: core values, culture, academic specialties, ideal candidate traits, notable programs, campus ethos | P1 | Active |
-| REQ-0006 | Display stored university profile (`--university-profile --show`) | P1 | Active |
-| REQ-0007 | Guidance engine (`--guidance --build`) matches student profile against a specified university profile and produces prescriptive recommendations on how to project the student's strengths to align with the university's values | P1 | Active |
-| REQ-0008 | Display stored guidance report (`--guidance --show`) | P1 | Active |
-| REQ-0009 | Essay advisor (`--essay --build`) accepts a user-provided essay prompt and a university name, generates a structured outline + inspiration samples anchored to the student's actual profile data | P1 | Active |
+| REQ-0003 | Display stored student profile | P1 | Active |
+| REQ-0004 | Enforce prerequisite: Guidance and Essay menu options are only available after a university is selected | P1 | Active <!-- CHG-002 --> |
+| REQ-0005 | University profile builder accepts a domain, scrapes the university website, and extracts: core values, culture, academic specialties, ideal candidate traits, notable programs, campus ethos | P1 | Active |
+| REQ-0006 | Display stored university profile | P1 | Active |
+| REQ-0007 | Guidance engine matches student profile against a specified university profile and produces prescriptive recommendations on how to project the student's strengths to align with the university's values | P1 | Active |
+| REQ-0008 | Display stored guidance report | P1 | Active |
+| REQ-0009 | Essay advisor accepts a user-provided essay prompt and a university name, generates a structured outline + inspiration samples anchored to the student's actual profile data | P1 | Active |
 | REQ-0010 | Essay advisor must cover personal statements and supplemental essays (one essay prompt answered per invocation) | P1 | Active |
-| REQ-0011 | Display stored essay outline (`--essay --show`) | P1 | Active |
-| REQ-0012 | `--print` flag exportable for all four outputs: student profile, university profile, guidance report, essay outline | P1 | Active |
-| REQ-0013 | All data stored in markdown format under `data/students/<student-name>/` and `data/universities/<university-name>/` | P1 | Active |
-| REQ-0014 | CLI entry point: `ao` with structured command-line switches | P1 | Active |
+| REQ-0011 | Display stored essay outline | P1 | Active |
+| REQ-0012 | PDF export offered as a follow-up prompt after any view or generate action | P1 | Active <!-- CHG-002 --> |
+| REQ-0013 | All data stored under `university-ao/students/<student-slug>/universities/<university-slug>/` with guidance and essays in dated subdirectories (`YYYY-MM-DD-HHmm`) | P1 | Active <!-- CHG-002 --> |
+| REQ-0014 | CLI entry point: `ao` with no arguments launches a full-screen interactive menu; no command-line flags | P1 | Active <!-- CHG-002 --> |
+| REQ-0015 | Menu flow: select/create student → select/create university → Guidance or Essay → select existing (dated) or create new → optional PDF export | P1 | Active <!-- CHG-002 --> |
+| REQ-0016 | Student and university names are selected from existing directories; "New Student" and "New University" options create the directory and launch the build wizard | P1 | Active <!-- CHG-002 --> |
+| REQ-0017 | Student context is set once at the top of the session; all subsequent menu actions operate within that student's context | P1 | Active <!-- CHG-002 --> |
+| REQ-0018 | "Update Profile" and "Delete Profile" (with confirmation) available at the student context level; "Update University" and "Delete University" (with confirmation) available at the university context level | P1 | Active <!-- CHG-002 --> |
+| REQ-0019 | Multiple dated guidance and essay outputs are supported per student+university pair; user selects from existing dated entries or creates a new one | P1 | Active <!-- CHG-002 --> |
+| REQ-0020 | Config menu option (peer to student selection) allows viewing and editing `GEMINI_API_KEY` and `GEMINI_MODEL`, persisted to `.env` | P1 | Active <!-- CHG-002 --> |
+| REQ-0021 | "Back" navigation available at every step to return to the previous screen | P1 | Active <!-- CHG-002 --> |
 
 ### 3.2 Out of Scope
 - Target university list management (no shortlist tracking across universities)
@@ -93,7 +102,7 @@ High school students who are self-managing their college application process and
 | REQ-0001 | Student profile wizard | C02-F01, C02-F02 | Fully covered |
 | REQ-0002 | Student profile fields | C02-F01, C02-F04 | Fully covered |
 | REQ-0003 | Show student profile | C02-F03 | Fully covered |
-| REQ-0004 | Prerequisite enforcement for university build | C01-F03 | Fully covered |
+| REQ-0004 | Prerequisite enforcement (Guidance/Essay gated on university selection) | C01-F05, C01-F06 | Fully covered |
 | REQ-0005 | University profile builder via web scraping | C03-F01, C03-F02, C03-F03, C03-F04 | Fully covered |
 | REQ-0006 | Show university profile | C03-F05 | Fully covered |
 | REQ-0007 | Guidance engine | C04-F01, C04-F02, C04-F03 | Fully covered |
@@ -101,34 +110,46 @@ High school students who are self-managing their college application process and
 | REQ-0009 | Essay advisor | C05-F01, C05-F02, C05-F03, C05-F04 | Fully covered |
 | REQ-0010 | Personal statement + supplemental coverage | C05-F01, C05-F03 | Fully covered |
 | REQ-0011 | Show essay outline | C05-F05 | Fully covered |
-| REQ-0012 | PDF print for all outputs | C01-F04, C06-F01, C06-F02 | Fully covered |
-| REQ-0013 | Markdown storage structure | C02-F04, C03-F03, C04-F03, C05-F04 | Fully covered |
-| REQ-0014 | CLI entry point and switches | C01-F01, C01-F02, C01-F05 | Fully covered |
+| REQ-0012 | PDF export after view/generate | C01-F10, C06-F01, C06-F02 | Fully covered |
+| REQ-0013 | Data storage under `university-ao/` with dated subdirs | C07-F05, C02-F04, C03-F03, C04-F03, C05-F04 | Fully covered |
+| REQ-0014 | Menu-driven entry point, no flags | C01-F01 | Fully covered |
+| REQ-0015 | Linear menu flow | C01-F01, C01-F02, C01-F03, C01-F04, C01-F05, C01-F06, C01-F07, C01-F08, C01-F09 | Fully covered |
+| REQ-0016 | Selectable student/university names + New entry creation | C01-F02, C01-F04 | Fully covered |
+| REQ-0017 | Student context sticky across session | C01-F02, C01-F03 | Fully covered |
+| REQ-0018 | Update/Delete for student and university profiles | C01-F03, C02-F05, C02-F08, C03-F06 | Fully covered |
+| REQ-0019 | Multiple dated guidance/essay outputs, selectable | C01-F07, C01-F08, C04-F03, C04-F05, C05-F04, C05-F06 | Fully covered |
+| REQ-0020 | Config menu for API key + model, persisted to .env | C01-F09, C07-F03, C07-F04 | Fully covered |
+| REQ-0021 | Back navigation at every step | C01-F01 through C01-F10 (all screens) | Fully covered |
 
 ---
 
 ## 4. Constraints & Trade-offs
 
 - **Node.js only** — runtime is Node.js; no polyglot stack.
-- **Web scraping requires internet** — `--university-profile --build` is the only function requiring network access; all other functions run fully offline.
+- **Web scraping requires internet** — university profile builder is the only function requiring network access; all other functions run fully offline.
 - **No paid APIs** — all scraping and content extraction must use freely available libraries (e.g., `axios` + `cheerio`, `playwright`).
-- **Google Gemini API** — guidance and essay generation use the Google Gemini API. API key provided by user via `.env` file in project root.
+- **Google Gemini API** — guidance and essay generation use the Google Gemini API. API key and model name configured via the in-menu Config option, persisted to `.env`. <!-- CHG-002 -->
 - **Samples are inspirational, not submission-ready** — the tool explicitly positions essay samples as reference only to avoid academic dishonesty concerns.
+- **No command-line flags** — `ao` is operated exclusively through the interactive menu; flag-based CLI is fully replaced. <!-- CHG-002 -->
 
 ---
 
 ## 5. Success
 
 ### 5.1 North Star Metric
-A student can run all four functions end-to-end for a given university — from building their profile to receiving an essay outline with inspiration samples — in a single CLI session.
+A student can run all four functions end-to-end for a given university — from building their profile to receiving an essay outline with inspiration samples — in a single interactive menu session without memorizing any command-line flags. <!-- CHG-002 -->
 
 ### 5.2 Launch Criteria
-- `--student-profile --build` wizard completes and saves a fully populated markdown profile
-- `--university-profile --build` scrapes a real university domain and saves a structured markdown profile
-- `--guidance --build` produces a readable, prescriptive markdown guidance report for a student + university pair
-- `--essay --build` produces a structured essay outline with at least 2 inspiration samples for a given prompt
-- `--print` generates a valid PDF for each of the four output types
-- All data files are written to the correct `data/` subdirectories
+- Running `ao` with no arguments enters the full-screen interactive menu immediately <!-- CHG-002 -->
+- Student and university names are selectable from existing directories; new entries can be created inline <!-- CHG-002 -->
+- Student profile wizard completes and saves a fully populated markdown profile
+- University profile builder scrapes a real university domain and saves a structured markdown profile
+- Guidance engine produces a readable, prescriptive markdown guidance report for a student + university pair
+- Essay advisor produces a structured essay outline with at least 2 inspiration samples for a given prompt
+- Multiple dated guidance and essay outputs are supported and selectable per student+university pair <!-- CHG-002 -->
+- PDF export is offered after any view or generate action <!-- CHG-002 -->
+- Config menu persists `GEMINI_API_KEY` and `GEMINI_MODEL` to `.env` <!-- CHG-002 -->
+- All data files are written under `university-ao/students/<student>/universities/<university>/` <!-- CHG-002 -->
 
 ### 5.3 Supporting Metrics
 - Wizard completion: student can answer all profile questions without confusion
@@ -148,3 +169,4 @@ A student can run all four functions end-to-end for a given university — from 
 | ID | Description | Date | Author |
 | :- | :---------- | :--: | :----- |
 | CHG-001 | Initial document created during Ideation | 2026-05-24 | SpecGantry |
+| CHG-002 | Menu-driven UX overhaul: replace all CLI flags with full-screen interactive menu; rename `data/` to `university-ao/`; restructure data paths; add Config, dated outputs, Back navigation, Delete with confirmation | 2026-05-27 | SpecGantry |
