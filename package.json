@@ -12,6 +12,7 @@
     "start": "node dist/components/c01-cli-shell/index.js",
     "typecheck": "tsc --noEmit",
     "lint": "eslint src/**/*.ts src/**/*.tsx",
+    "deploy": "node scripts/deploy.js",
     "postinstall": "node scripts/install-browsers.js"
   },
   "files": [
