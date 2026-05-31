@@ -3,76 +3,105 @@ name: reverse-engineer
 description: Reverse engineers an existing codebase into SpecGantry artifacts and component specifications, bringing a pre-built system into the structured lifecycle framework.
 user-invocable: true
 author: Mangesh Pise <mppise@gmail.com>
-license: Apache-2.0 (see LICENSE in project root)
+license: Apache-2.0
 ---
 
-# Reverse Engineer
+# Reverse Engineer Skill
 
-> Wearing the Discovery Analyst hat — I'll dig into what's already been built, document it faithfully in the SpecGantry framework, and surface any improvements worth considering.
+**Phase:** Pre-Ideation (outside normal lifecycle)
 
-## Before Starting
+**Entry:** Existing codebase needs to be brought into SpecGantry framework
 
-1. Read `./STATUS.md` — note any existing project state.
-2. Scan the repository structure to understand what code, configuration, and documentation already exists.
-3. Check whether `A_Project.md`, `B_Architecture.md`, or any component specs already exist in `./SPECS/`. If they do, read them first — **enhance and update** rather than overwrite. Preserve any content that is still accurate.
+**Exit:** `./SPECS/artifacts/` fully populated with Project.md, Architecture/, component specs, and Decisions.md
 
-> This process runs **on auto-pilot** — no user input is expected or required during discovery, since DevLead may not know the full details of an already-built system.
+**Deliverables:**
+- `./SPECS/artifacts/Project.md` (discovered project definition)
+- `./SPECS/artifacts/Architecture/` (system architecture documentation)
+- `./SPECS/components/<component>/` (per-component specs)
+- `./SPECS/artifacts/Decisions.md` (architectural decisions, inferred)
+- `./STATUS.md` updated to reverse engineering: Complete
 
-> This skill **does not write or modify source code**. All outputs are documentation artifacts only.
+---
 
-## Component Identification Threshold
+## Startup Checklist
 
-A **component** is a distinct capability that either: (a) can be developed and deployed independently, or (b) provides a named, reusable service to other parts of the system. Individual classes, utility functions, and helper modules are **not** components — they belong inside a component's spec. When in doubt, lean toward fewer, larger components rather than many small ones.
+1. Scan codebase — identify language(s), frameworks, project layout, existing documentation
+2. Check for existing `./SPECS/` artifacts. Enhance and update rather than overwrite accurate content.
+3. Note: Reverse engineering runs on auto-pilot — no user input expected during discovery
 
-## Stages
+---
 
-Do not skip or reorder.
+## Stage 1: Discover & Document
 
-### 1. Discover
-Deep-dive into the codebase and any available documentation. Populate the following artifacts as laid out in the template, but be also prepared to iterate as you discover more based on what you find:
+Deep-dive into codebase and available documentation. Populate incrementally:
 
-- `./SPECS/artifacts/A_Project.md` — what is this system, what problem does it solve? 
-- `./SPECS/artifacts/B_Architecture.md` — technology stack, components, data flows, deployment model.
-- `./SPECS/artifacts/C_Assumptions.md`, `D_Decisions.md`, `E_Risks.md` — anything inferred, implicitly decided, or flagged as a risk in the existing system.
+- `./SPECS/artifacts/Project.md` — what is this system, what problem does it solve?
+- `./SPECS/artifacts/Architecture/` — technology stack, components, data flows, deployment model
+- `./SPECS/artifacts/Decisions.md` — anything inferred, implicitly decided, or flagged as risk
 
-This stage aligns with the Ideation and Planning phases of the lifecycle.
+**Process:**
+1. Analyze source code structure, entry points, data flow
+2. Identify problem domain and system capabilities
+3. Write Project.md incrementally (problem statement, goals, scope, key features)
+4. Map architecture across all layers (data, compute, integration, deployment)
+5. Write Architecture/ incrementally, documenting key decisions as discovered
+6. Record inferred decisions and risks in Decisions.md
+7. Validate each artifact section against source code. Flag undocumented behaviors immediately.
 
-### 2. Design
-Translate the discovered information into component specifications. For each functional component identified, create the specification package under `./SPECS/components/<component_name>/` using the same structure as the Detailed Design phase would (`A_Core_Spec.md`, `B_Interfaces.md`, and optionally `C_Specialized_Specs.md`).
+This stage aligns with Ideation + Design phases.
 
-This stage aligns with the Detailed Design phase of the lifecycle.
+---
 
-### 3. Challenge
-Stress-test the documented architecture across four dimensions:
-- **Consistency** — do all components and interfaces agree with each other?
-- **Completeness** — are there undocumented behaviors or missing interfaces?
-- **Risk** — are there technical debts, security gaps, or fragile dependencies?
-- **Simplicity** — is the system more complex than the requirements demand?
+## Stage 2: Component Specs & Validation
 
-Produce **recommendations only** — do not implement any changes.
+Translate discovered information into component specifications (per CLAUDE.md "Connective Layer"). For each functional component:
 
-### 4. Gate Check
-Present a summary of all artifacts produced and the Challenge recommendations to DevLead. Confirm mutual agreement before closing the skill. Update `./STATUS.md` to reflect that reverse engineering is complete.
+1. Create `./SPECS/components/<component-name>/` directory
+2. Create two specs (structure per CLAUDE.md standards):
+   - `A_Core_Spec.md` — features table with Status (per CLAUDE.md Feature Status Values) and discovered behavior
+   - `B_Specification.md` — request/response contracts as implemented, operational requirements as discovered (error handling, observability, data, security, testing thresholds)
+3. After each spec, validate (per CLAUDE.md standards):
+   - Consistency — component interfaces match Architecture/?
+   - Completeness — all source code behaviors documented? (use CLAUDE.md Definition of Done as checklist)
+   - Risk — technical debts, security gaps, fragile dependencies?
+   - Simplicity — documented behavior more complex than needed?
+   - Traceability — infer requirements from code and document as REQ-NNNN if not already in Project.md (per CLAUDE.md Requirement Traceability)
+4. Surface findings as notes in Decisions.md
 
-## Output
+Lean toward fewer, larger components rather than many small ones.
 
-Generate a structured report at `./REV-ENG/{{ yyyy.mm.dd_hhmm }}.md` using the following sections. Note, SpecGantry will refer to this report in case the DevLead later decides to implement any of the recommendations — it serves as a record of the original state and the rationale behind suggested improvements:
+This stage aligns with Design phase.
 
-| Section | Contents | Severity | Suggested Action | Status |
-|---|---| |---|---|---|---|
-| **Executive Summary** | What was discovered, how many components were identified, and the overall health verdict (Clean / Needs Attention / Critical Issues Found) | `SEV-1` / `SEV-2` / `SEV-3` | High-level recommendation for next steps (e.g., "System is generally well-structured but has some security risks that should be addressed in the next iteration") | `Open` / `In Progress` / `Closed` |
-| **Artifacts Produced** | Table listing each file created or updated, its path, and a one-line description of what it contains | `SEV-1` / `SEV-2` / `SEV-3` | N/A | `Open` / `In Progress` / `Closed` |
-| **Component Map** | List of identified components, their purpose, and any interfaces between them | `SEV-1` / `SEV-2` / `SEV-3` | N/A | `Open` / `In Progress` / `Closed` |
-| **Challenge Findings** | One sub-section per dimension (Consistency · Completeness · Risk · Simplicity) — each finding as a bullet with severity (`SEV-1` / `SEV-2` / `SEV-3`) and a recommended action | `SEV-1` / `SEV-2` / `SEV-3` | N/A | `Open` / `In Progress` / `Closed` |
-| **Recommendations** | Prioritized list of improvements, numbered, each with a suggested next step | `SEV-1` / `SEV-2` / `SEV-3` | N/A | `Open` / `In Progress` / `Closed` |
+---
 
-Also include a diagram or visual representation of the system architecture if applicable. This can be a simple block diagram showing components and their interactions, or a more detailed flowchart of data and control flows, depending on what best conveys the structure of the system.
+## Stage 3: Gate Confirm
+
+1. Present artifacts produced (Project.md, Architecture/, components, decisions)
+2. Surface recommendations from inline validation (optional improvements, not obligations)
+3. Confirm mutual agreement with DevLead that reverse engineering complete and ready for next phase
+4. Update `./STATUS.md` to reverse engineering: Complete
+5. Confirm: "Reverse engineering complete, ready for Ideation" and await DevLead confirmation
+
+---
+
+## Key Points
+
+- **Work autonomously:** Make no assumptions about what DevLead knows. Discover, document, recommend — don't implement.
+- **Identify components correctly:** A component either (a) can be developed/deployed independently, or (b) provides named, reusable service to other parts. Classes, utilities, helpers are NOT components — they belong inside a component's spec.
+- **Validate inline:** Immediately validate each artifact section against source code + prior sections. Catch issues early.
+- **Surface improvements, not obligations:** Recommendations are advisory — DevLead decides which to act on and when.
+
+---
 
 ## Scope
 
-**Files in scope:** `./SPECS/artifacts/A_Project.md` · `./SPECS/artifacts/B_Architecture.md` · `./SPECS/artifacts/C_Assumptions.md` · `./SPECS/artifacts/D_Decisions.md` · `./SPECS/artifacts/E_Risks.md` · `./SPECS/components/` · `./REV-ENG/`
+**Files in scope (created/modified):**
+- `./SPECS/artifacts/Project.md`
+- `./SPECS/artifacts/Architecture/` (all files)
+- `./SPECS/artifacts/Decisions.md`
+- `./SPECS/components/` (all component specs)
 
-**Strictly read-only:** All source code files — no code is created or modified.
+**Files read-only:**
+- All source code (no code created/modified)
 
-**Artifact ID format:** `^[ADR]-[a-zA-Z0-9]{8}$`
-— `A-` for assumptions · `D-` for decisions · `R-` for risks
+**Standards:** CONTRACT.md §4.5.1 (artifact IDs), CLAUDE.md (global standards)

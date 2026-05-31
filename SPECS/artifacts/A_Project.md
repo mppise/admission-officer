@@ -83,6 +83,10 @@ High school students who are self-managing their college application process and
 | REQ-0019 | Multiple dated guidance and essay outputs are supported per student+university pair; user selects from existing dated entries or creates a new one | P1 | Active <!-- CHG-002 --> |
 | REQ-0020 | Config menu option (peer to student selection) allows viewing and editing `GEMINI_API_KEY` and `GEMINI_MODEL`, persisted to `.env` | P1 | Active <!-- CHG-002 --> |
 | REQ-0021 | "Back" navigation available at every step to return to the previous screen | P1 | Active <!-- CHG-002 --> |
+| REQ-0022 | Persistent status bar footer appears at absolute bottom of screen, showing the most recent message (progress, warning, error, or success) from any operation | P1 | Active <!-- CHG-003 --> |
+| REQ-0023 | Status messages auto-clear on next user action (menu selection, form input); previous messages are retained in a message log | P1 | Active <!-- CHG-003 --> |
+| REQ-0024 | Full-screen message log modal accessible from status bar or menu; displays all messages with timestamps, sorted reverse-chronological (newest first) | P1 | Active <!-- CHG-003 --> |
+| REQ-0025 | Status bar supports multi-line messages with arrow-key scrolling if text exceeds available terminal width | P1 | Active <!-- CHG-003 --> |
 
 ### 3.2 Out of Scope
 - Target university list management (no shortlist tracking across universities)
@@ -92,6 +96,9 @@ High school students who are self-managing their college application process and
 - Mobile or web interface
 - Automated submission or integration with Common App / Coalition App
 - AI-generated essays (samples are for inspiration only, not submission-ready drafts)
+- Persistent message log across sessions (log is in-memory only; clears on exit)
+- Message filtering or search
+- Message export (e.g., save log to file)
 
 ### 3.3 Traceability Index
 
@@ -120,6 +127,10 @@ High school students who are self-managing their college application process and
 | REQ-0019 | Multiple dated guidance/essay outputs, selectable | C01-F07, C01-F08, C04-F03, C04-F05, C05-F04, C05-F06 | Fully covered |
 | REQ-0020 | Config menu for API key + model, persisted to .env | C01-F09, C07-F03, C07-F04 | Fully covered |
 | REQ-0021 | Back navigation at every step | C01-F01 through C01-F10 (all screens) | Fully covered |
+| REQ-0022 | Persistent status bar footer (latest message) | C08-F01, C08-F02 | To be designed (CHG-003) |
+| REQ-0023 | Message auto-clear on user action; retained in log | C08-F03, C08-F04 | To be designed (CHG-003) |
+| REQ-0024 | Full-screen message log modal | C08-F05, C08-F06 | To be designed (CHG-003) |
+| REQ-0025 | Multi-line scrollable message support | C08-F02, C08-F07 | To be designed (CHG-003) |
 
 ---
 
@@ -160,7 +171,15 @@ A student can run all four functions end-to-end for a given university — from 
 
 ## 6. Open Questions
 
-> No open questions. All items resolved during Ideation.
+### CHG-003 — Persistent Status Bar (New Feature)
+
+**Decided:**
+
+1. **Message Display:** Status bar shows **last message only**. Separate full-screen modal available to view complete **message log history**.
+2. **Message Format:** **Plain text only** (no timestamp, no icon). User can view timestamp in full log if needed.
+3. **Message Clearing:** Messages clear **on next user action** (menu selection, form input, navigation).
+4. **Footer Layout:** **Scrollable if needed** — supports multi-line messages with arrow-key scrolling for long text.
+5. **Positioning:** **Fixed at absolute screen bottom** — menu content stays above; status bar always visible at bottom.
 
 ---
 
@@ -170,3 +189,4 @@ A student can run all four functions end-to-end for a given university — from 
 | :- | :---------- | :--: | :----- |
 | CHG-001 | Initial document created during Ideation | 2026-05-24 | SpecGantry |
 | CHG-002 | Menu-driven UX overhaul: replace all CLI flags with full-screen interactive menu; rename `data/` to `university-ao/`; restructure data paths; add Config, dated outputs, Back navigation, Delete with confirmation | 2026-05-27 | SpecGantry |
+| CHG-003 | Persistent status bar footer: display latest message from all operations (progress, warning, error, success); in-memory log with full-screen modal viewer; auto-clear on user action; multi-line scrollable support; new component C08 to manage status bar and log. REQ-0022–0025 added. | 2026-05-31 | DevAgent |

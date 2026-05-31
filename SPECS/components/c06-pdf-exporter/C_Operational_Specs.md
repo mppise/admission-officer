@@ -8,8 +8,17 @@
 | :------ | :---------- | :------ | :------ | :------- |
 | C06-F01 Read markdown | Permanent (file not found) | 0 | — | "PDF export failed: source file not found at <path>" + exit(1) |
 | C06-F01 marked.parse | Permanent (parse error) | 0 | — | "PDF export failed: could not parse markdown" + exit(1) |
-| C06-F02 Puppeteer launch | Transient (browser crash) | 1 | 5s | After retry failure: "PDF export failed: browser could not start. You can open the markdown file directly at <path>" + exit(1) |
-| C06-F02 page.pdf() | Permanent (write error) | 0 | — | "PDF export failed: could not write to <pdfPath>" + exit(1) |
+| C06-F02/F03 Puppeteer launch (first attempt) | Transient (browser missing/crash) | 1 | 5s | On first failure: attempt C06-F03 (auto-install browsers) |
+| C06-F03 Browser auto-install | Transient | 1 | none | If auto-install fails: return actionable error with manual install command |
+| C06-F02 Puppeteer launch (after F03) | Permanent | 0 | — | "PDF export failed: could not launch browser. Please ensure Puppeteer Chrome is installed. Try running: npx puppeteer browsers install chrome. Error: <details>" + exit(1) |
+| C06-F02 page.pdf() | Permanent (write error) | 0 | — | "PDF export failed: could not write to <pdfPath>. <error>" + exit(1) |
+
+**C06-F03 Browser Installation Assurance:**
+- Called at first Puppeteer launch failure (before retry)
+- Spawns `npx puppeteer browsers install chrome` and `npx playwright install chromium`
+- Detects CI/CD environments (CI=true, OFFLINE=true) and skips installation
+- Timeout: 5 minutes per browser install
+- Gracefully continues if install fails (error handling falls through to browser launch attempt)
 
 Fallback message always includes the markdown path so the user can access the content directly even if PDF export fails. This addresses R-TC-AO000003 contingency.
 
@@ -82,7 +91,22 @@ PDF files contain the same content as the source markdown. Same local-only data 
 
 ## Infrastructure
 
-No environment variables required. C06 is fully offline. Puppeteer downloads a Chromium binary on `npm install` — this is a one-time setup cost, not a runtime dependency.
+**Browser Installation Model:**
+- `package.json` postinstall script: `node scripts/install-browsers.js`
+- Runs after `npm install` (both local dev and global installs)
+- Detects CI/offline mode via `CI` and `OFFLINE` environment variables; skips download if detected
+- Downloads Puppeteer Chrome + Playwright Chromium (~300–500 MB total)
+- 5-minute timeout per browser; logs warnings on failure but allows install to proceed
+- Graceful fallback: if postinstall fails, runtime will attempt auto-install (C06-F03)
+
+**Environment Variables:**
+- `CI` (set by CI/CD platforms) — skips browser download
+- `OFFLINE` (user-set) — skips browser download
+- `PUPPETEER_CACHE_DIR` — custom Puppeteer cache location
+- `PLAYWRIGHT_BROWSERS_PATH` — custom Playwright cache location
+
+**Documentation:**
+- User guide: `docs/BROWSER_INSTALLATION.md` — troubleshooting, CI/CD examples, offline installation
 
 ---
 

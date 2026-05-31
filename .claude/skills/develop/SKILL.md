@@ -1,142 +1,166 @@
 ---
 name: develop
-argument-hint: functional_component_name
-description: Drives the development phase by implementing features against component specifications, maintaining artifacts, and keeping the build clean — gating exit via the deploy skill.
-user-invocable: true
-author: Mangesh Pise <mppise@gmail.com>
-license: Apache-2.0 (see LICENSE in project root)
+description: Unified Development + inline audit phase. Implements components per spec, runs tests, audits for traceability + compliance, and marks release ready. No separate Deployment Readiness phase.
+author: Mangesh Pise <mppise@anthropic.com>
+license: Apache-2.0
 ---
 
-# Develop
+# Develop Skill
 
-> Developer hat on — let's bring this spec to life with clean, traceable code that a human or an AI agent can understand, maintain, and build upon.
+## SKILL STARTUP: Auto-Compact Check
 
-## Scoped Component
+```bash
+if bash .claude/hooks/compact-check.sh; then
+  echo "⏳ Context compaction required. Running /compact..."
+  # Invoke /compact, then resume below after SESSION HANDSHAKE re-runs
+fi
+```
 
-This development session covers: **{{ functional_component_name }}**
+---
 
-## Before Starting
+**Phase:** Development (includes inline audit; no separate Deployment Readiness)
 
-1. Read `./STATUS.md` — confirm Development is the active phase and `{{ functional_component_name }}` shows `Ready`.
-2. Read `./SPECS/artifacts/B_Architecture.md` — the **mandatory anchor** for all implementation decisions.
-3. Read all specification files in `./SPECS/components/{{ functional_component_name }}/`.
-4. Check `C_Assumptions.md`, `D_Decisions.md`, and `E_Risks.md` for open `[ ]` items — **STOP** if any exist and ask DevLead to resolve them first.
+**Entry:** All components have Ready specs in `./SPECS/components/`
 
-## Stages
+**Exit:** All components Complete + inline audits PASS + Decisions.md Actionable empty + release marked ready in VERSION History
 
-Do not skip or reorder.
+**Deliverables:**
+- Full implementation of all components in `./src/`
+- Tests passing at thresholds defined in component specs
+- Inline audit results (PASS/FAIL) per component + system
+- Release assigned + marked ready in `./STATUS.md` Version History
+- Deployment scripts created (if audit PASS)
 
-### 1. Assess
-Review the architecture and component specifications. Confirm the build order, dependencies, and environment requirements. Identify any gaps or conflicts before writing any code.
+---
 
-### 2. Implement
-Implement features per specification. Write code that is clean, modular, and traceable to specs. Iterate: implement → test → debug → repeat until error-free.
+## Startup Checklist (Phase Gating — STRICT)
 
-**Traceability:** Reference the feature ID from `A_Core_Spec.md` in code comments at the entry point of each feature's implementation (e.g., `// [F-xxxxxxxx] Handles token refresh`). This links code directly to the spec without over-commenting.
+**CRITICAL RULE:** No code changes without Design gate passing. This is non-negotiable.
 
-**"Error-free" defined:** All implemented features pass their tests, there are no compilation errors, and no runtime exceptions occur during normal execution paths.
+1. Read `./STATUS.md` — check current phase
+   - If Design = ✅ Complete: Proceed to Development
+   - If Design = ⬜ or 🔄: **BLOCK.** "Design not complete. Resume `/design` first to create/finalize component specs."
+   - If Ideation = ⬜ or 🔄: **BLOCK.** "Ideation not complete. Run `/ideate` first."
+   - If Development = 🔄 In progress: Resume Development, continue with incomplete components
+   - If Development = ✅ Complete: Development done. Release ready. You can re-iterate in future phase.
 
-**Discovery Pivot** — if a design flaw, architectural conflict, or clearly better approach surfaces mid-implementation: **STOP**, signal a "Discovery Pivot", and invoke `/brainstorm` to analyze the path before changing any spec or code.
+2. Verify all component specs exist and are Ready:
+   - For each component in Project.md:
+     - Check `./SPECS/components/<component>/A_Core_Spec.md` exists
+     - Check `./SPECS/components/<component>/B_Specification.md` exists
+     - Check STATUS.md shows component status = ✅ Ready (not ⬜ or 🔄)
+   - If any missing or not Ready: **BLOCK.** "Component spec `<name>` not ready. Resume `/design` to complete it. Cannot start `/develop` until all specs are Ready."
 
-**Change tiers:**
+3. Read each component spec in `./SPECS/components/` — these are your requirements
 
-| Tier | Approach |
-|---|---|
-| **Major** | Full design cycle — update spec first, then implement. |
-| **Minor** | Propose spec and code updates together in one review. |
-| **Trivial** | Update code and add an Implementation Note to the spec. |
+4. Review `./SPECS/artifacts/Decisions.md` Actionable + Parking Lot tables, escalate blockers
 
-### 3. Document
-Add code comments where logic is non-obvious. For each implemented feature, generate user documentation using the `/documentation` skill. Reference the documentation path in relevant code comments.
+5. Confirm with DevLead: code structure (languages, frameworks, build system)
 
-**UI Help Wiring** — if the project has a web UI (check `B_Architecture.md`) and any feature in `A_Core_Spec.md` has a `Doc Level` of `Page`, `Component`, or `Concept`:
+**If any gating check fails, refuse to proceed and explain which artifact is missing.**
 
-1. **Propose once.** Before writing any help triggers, read the UI framework from `B_Architecture.md` and propose the most natural help-trigger pattern for that stack. Examples — not prescriptive:
-   - Bootstrap 5 → Bootstrap Tooltips for `Concept`, Bootstrap Modals for `Page` and `Component`
-   - React → a lightweight tooltip/popover component (or `title` attribute if no library is present)
-   - Vue → similar to React; use existing UI library conventions if one is defined
-   - Plain HTML/JS → `<details>` element for inline help, or a minimal vanilla JS modal
-   - If a design system or component library is already referenced in `B_Architecture.md`, prefer its native help/info components
+---
 
-   Present the proposal to DevLead as a short summary (trigger element, open behavior, dismissal). **Wait for explicit approval before writing any trigger code.** This approval covers the entire component — do not re-ask per feature.
+## Stage 1: Implementation
 
-2. **Wire consistently.** Once approved, apply the pattern to every UI feature in this component based on its `Doc Level`:
-   - `Page` → place the trigger (e.g., a `?` button) in the page header or toolbar
-   - `Component` → place an info icon (ℹ) adjacent to the component's title or primary label
-   - `Concept` → wrap the term in the approved tooltip trigger wherever it appears in the template
+For each in-scope component, implement all features per spec using TDD (test first, implement to pass, refactor):
 
-3. **Use a data attribute for the doc path** (e.g., `data-help-src="help/component-login-form.html"`) so the path is resolved at runtime and not hardcoded into the trigger logic. This keeps all help-link references consistent and easy to update.
+1. Read component spec (A_Core_Spec.md, B_Specification.md)
+2. Implement all features in `./src/` per spec. Apply CLAUDE.md Definition of Done for each feature:
+   - Add feature ID in code comments at entry point: `// [C01-F01] Handles login` (per CLAUDE.md Code-Level Traceability)
+   - Implement inline code documentation per CLAUDE.md "Inline Code Documentation" standards
+   - Match all interfaces exactly per B_Specification.md
+   - Satisfy all B_Specification.md requirements (error handling, security, observability, etc.)
+3. Write tests at coverage thresholds (per CLAUDE.md Testing Requirements; e.g., 80% line coverage from B_Specification.md). All tests pass.
+4. Run formatter + linter. Zero errors required.
+5. Manually test all features from component spec.
+6. Mark Feature Status in A_Core_Spec.md as `In Progress` (per CLAUDE.md Feature Status Values table)
 
-### 4. Gate Check
-Update the Feature Status column in `./SPECS/components/{{ functional_component_name }}/A_Core_Spec.md` for every completed feature. Update the Component Status Tracker in `./STATUS.md` to `Complete` for this component. When all components are `Complete`, update the Project Status Tracker to `Development: Complete`.
+**Fast-tracks during this stage:**
+- **Hotfix (<20 LOC):** Write 1-page spec, get DevLead approval, implement + test, add decision to Decisions.md (move to Actioned after approval)
+- **Lightweight Enhancement (<50 LOC):** Same as hotfix
+- **Spec Amendment:** Tag with `CHG-XXX`, get DevLead approval, update spec + code, re-run tests
+
+---
+
+## Stage 2: Component Inline Audit
+
+For each completed component, perform audit using CLAUDE.md Definition of Done as checklist:
+
+1. **Spec-Code Match:** Every feature in code maps back to A_Core_Spec.md (verify feature ID in comments per CLAUDE.md Code-Level Traceability)
+2. **Interface Match:** All request/response envelopes match B_Specification.md exactly (parameter names, error codes, event formats)
+3. **Operational Match:** All B_Specification.md requirements satisfied (per CLAUDE.md Definition of Done):
+   - Error handling strategy applied
+   - Security controls in place
+   - Observability (logging/tracing) in place per CLAUDE.md standards
+   - Notifications sent per spec
+   - Data handled per spec (formats, validation, storage)
+   - Scalability/performance considerations addressed
+4. **Secrets Audit:** Scan code for hardcoded secrets, API keys, PII per CLAUDE.md Definition of Done. **FAIL if any found.** Do not proceed.
+5. **Tests:** All tests passing at thresholds per CLAUDE.md Testing Requirements; coverage tool confirms threshold met
+6. **Documentation:** User docs (if UI) or API docs (if service) generated per CLAUDE.md Definition of Done
+7. **Traceability:** Every feature in code traces backward to Project.md REQ-NNNN via component spec Req Ref column per CLAUDE.md Requirement Traceability
+8. Mark component audit result (PASS or FAIL) in `./STATUS.md` Component Status Tracker
+
+If FAIL: Fix, re-audit. Do not mark Complete until PASS.
+If PASS: Mark Feature Status `Complete` (per CLAUDE.md Feature Status Values), proceed to Stage 3.
+
+---
+
+## Stage 3: System Audit & Deployment
+
+After all components Complete with component audits PASS:
+
+1. **Integration:** Test all components together (cross-component interfaces, data flows)
+2. **End-to-End:** Run E2E tests defined in B_Specification.md
+3. **Decisions:** Decisions.md Actionable table must be empty before release. Escalate blockers.
+4. **Release Assignment:** Assign release number (major.minor.patch per Architecture/ versioning)
+5. **Version History:** Update `./STATUS.md` Version History:
+   - Version = release number
+   - Status = 🔄
+   - Audit Status = PASS (all audits PASS) or FAIL (any failure)
+   - Deployment ready on = [today] (if PASS)
+6. **Deployment Scripts (if PASS):** Generate/update scripts in `./deploy/` (e.g., `./deploy/rel_2024.01.15.1400/go.sh`)
+
+Overall verdict: PASS (all + system audit PASS) or FAIL (any failure).
+
+If FAIL: Fix failures, re-audit affected components (back to Stage 2), return to Stage 3.
+
+---
+
+## Stage 4: Gate Confirm
+
+1. All in-scope components show Complete in STATUS.md Component Status Tracker
+2. All inline audits show PASS. System audit = PASS. Deployment scripts created.
+3. Decisions.md Actionable table empty. Parking Lot items have mitigations.
+4. Version History entry shows release number + Audit Status PASS + marked ready on [today]
+5. User docs generated (if UI features). API docs updated (if service features).
+6. Confirm: "Ship phase complete, ready for deployment" and await DevLead final confirmation
+
+---
+
+## Key Points
+
+- **Spec wins:** Spec always wins over personal preference. If code diverges from spec, update spec first (via amendment), then update code.
+- **Audit is mandatory:** Every component + system must PASS before release. You catch spec-code mismatches, secrets, traceability gaps before DevLead sees them.
+- **Maintain STATUS.md:** Move components In Progress → Complete as audits PASS. Update Project Status to Development: Complete when all done.
+- **Fast-track handling:** Record hotfix/enhancement decisions in Decisions.md. Mark escalation rule if pattern emerges (so next release DevLead considers full Design).
+- **Secrets block release:** Scan for secrets, API keys, PII. If any found, FAIL audit immediately and report to DevLead before proceeding.
+- **Validate inline:** Surface conflicts early, don't batch for end-of-phase review.
+
+---
 
 ## Scope
 
-**Files in scope:** `./src/` · `./SPECS/components/{{ functional_component_name }}/A_Core_Spec.md` (status updates only) · `./SPECS/artifacts/C_Assumptions.md` · `./SPECS/artifacts/D_Decisions.md` · `./SPECS/artifacts/E_Risks.md` · `<frontend_dir>/docs/` or `./docs/` (written by `/documentation` skill — see `B_Architecture.md` for frontend directory)
+**Files in scope (created/modified):**
+- `./src/` (full implementation)
+- `./STATUS.md` — Component Status Tracker, Version History
+- `./deploy/` (deployment scripts if audit PASS)
+- Component specs A_Core_Spec.md (Feature Status, Change History if amended)
+- `./SPECS/artifacts/Decisions.md` (fast-track decisions if applicable)
 
-**Environment variables:** Use `./src/.env`. If it does not exist, create it and ask DevLead to supply any unknown values.
+**Files read-only:**
+- `./SPECS/artifacts/Architecture/` (locked; no amendments)
+- `./SPECS/components/<component>/B_Specification.md` (locked unless amended per Stage 1)
 
-**Artifact ID format:** `^[ADR]-[a-zA-Z0-9]{8}$`
-— `A-` for assumptions · `D-` for decisions · `R-` for risks
-
----
-
-## Appendix: AI Prompt & Tool File Conventions
-
-*Apply this section only when the component involves AI capabilities — prompt files or tool definitions.*
-
-### File Types
-
-**`<id>.prompt.md`** — prose prompts (system instructions, extraction prompts, behavioral rules)
-
-Structure: YAML frontmatter block, then the prompt body in Markdown. Everything after the closing `---` is the exact string sent to the AI.
-
-**`<id>.tools.yaml`** — tool/function definitions sent to the AI API
-
-Structure: pure YAML, no frontmatter. Top-level keys: `id`, `description`, `tools` (array).
-
-### Frontmatter Schema for `.prompt.md`
-
-    ---
-    id: <unique_identifier>
-    description: <one-line summary of what this prompt does and when it is used>
-    loader_params:
-      - name: PARAM_NAME
-        format: <expected format, e.g. "ISO 8601 date string", "JSON array of strings">
-        injected_by: <module or call site that supplies this value at runtime>
-        purpose: <why the AI needs this value>
-    ---
-
-- If no runtime parameters: `loader_params: []`
-- `loader_params` documents runtime token injection only — unrelated to AI tool/function parameter schemas.
-
-### Parameter Injection
-
-Use `{{PARAM_NAME}}` tokens in the prompt body. Replaced with real values at runtime before sending.
-
-- Every `{{TOKEN}}` in the body must be declared in `loader_params` — undeclared tokens throw at load time.
-- Every declared param must be supplied at the call site — missing values throw at load time.
-- Parameters are always injected as plain strings.
-
-### Loader Contract
-
-A shared loader at `src/prompts/loader.js` exposes:
-
-    loadPrompt(id, params?) → string   // reads *.prompt.md, strips frontmatter, injects params
-    loadTools(id)           → object[] // reads *.tools.yaml, returns the tools array
-
-Both throw on file-type mismatch, undeclared tokens, or missing params.
-
-### Directory Layout
-
-    src/prompts/
-      loader.js         ← shared loader (only non-prompt file here)
-      *.prompt.md       ← prose prompts
-      *.tools.yaml      ← tool definitions
-
-### Formatting Rules
-
-- Use `##` headings, `---` horizontal rules, `-` bullets, `1.` numbered steps in prompt bodies.
-- Use `|-` for multi-line `description` values in `.tools.yaml` (preserves line breaks, no trailing newline).
-- Use 4-space-indented code blocks in prompt bodies — **not** fenced code blocks, which break SKILL.md rendering.
-- **Bold** for critical constraints; inline code for field names and literal values.
+**Standards:** CONTRACT.md §4.5.1 (artifact IDs), CLAUDE.md (feature status, Definition of Done, testing requirements)

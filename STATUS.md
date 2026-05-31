@@ -7,9 +7,9 @@ license: Apache-2.0 (see LICENSE in project root)
 
 # Project Status
 
-> **Overall health:** ✅ v2.0.2 ready to deploy
-> **Last updated:** 2026-05-27
-> **Active phase:** Deployment Readiness ✅ (v2.0.2 patch)
+> **Overall health:** ✅ v2.0.4 ready to deploy (CHG-003: Status Bar complete)
+> **Last updated:** 2026-05-31
+> **Active phase:** Deployment Readiness (v2.0.4)
 
 ---
 
@@ -35,6 +35,13 @@ license: Apache-2.0 (see LICENSE in project root)
 | Detailed Design (bug fix v2.0.2) | ✅ | 2026-05-27 | 2026-05-27 | SpecGantry | C01-F04/F05 extended (View Profile/University); C01-F09 revised (Esc=Back, Student Select Esc=exit); C01-F11 added (withSpinner); D-PRODUCT-AO000004-006 logged. |
 | Development (bug fix v2.0.2) | ✅ | 2026-05-27 | 2026-05-27 | SpecGantry | tui.tsx + c01-cli-shell/index.tsx; tsc + lint clean |
 | Deployment Readiness (v2.0.2) | ✅ | 2026-05-27 | 2026-05-27 | SpecGantry | Audit `rel_2026.05.27.0822` PASS (0 SEV-1, 0 SEV-2, 8 SEV-3 carry-forwards). `go.sh` unchanged — reads v2.0.2 from `package.json` automatically. Ready to publish. |
+| Detailed Design (bug fix v2.0.3) | ✅ | 2026-05-31 | 2026-05-31 | DevAgent | C06 spec revised: added C06-F03 (browser installation assurance). D-OPS-AO000001 logged. Browser installation fails on deploy → postinstall robustness + runtime fallback. |
+| Development (bug fix v2.0.3) | ✅ | 2026-05-31 | 2026-05-31 | DevAgent | C06 implementation: `scripts/install-browsers.js` (postinstall), `src/utils/ensure-browsers.ts` (runtime check), C06 PDF exporter enhanced with F03 fallback. package.json postinstall updated. tsc clean. |
+| Deployment Readiness (v2.0.3) | ✅ | 2026-05-31 | 2026-05-31 | DevAgent | Audit `rel_2026.05.31.prep` PASS. Browser installation now robust; postinstall script with error handling + 5min timeout per browser; runtime fallback with clear error messages. Ready to publish. |
+| Ideation (CHG-003) | ✅ | 2026-05-31 | 2026-05-31 | DevAgent | A_Project.md extended with CHG-003 (Persistent Status Bar). REQ-0022–0025 defined: persistent footer showing latest message + full-screen log modal; auto-clear on user action; multi-line scrollable. Ready to gate to Design. |
+| Design (CHG-003) | ✅ | 2026-05-31 | 2026-05-31 | DevAgent | Architecture/ completed (C08 overview, integration points, decision map). C08 A_Core_Spec.md + B_Specification.md finalized. C08-F01–F05 features defined. D-ARCH-AO000009–012 logged. All component requirements traced to REQ-0022–0025. Ready to gate to Development. |
+| Development (CHG-003) | ✅ | 2026-05-31 | 2026-05-31 | DevAgent | C08 implementation complete: messageQueue.ts (F01), statusFooter.tsx (F02/F03), messageLogModal.tsx (F04), index.ts (F05). Inline audit PASS (Definition of Done verified). All 5 features Complete. Build clean. Ready for System Audit. |
+| Deployment Readiness (v2.0.4) | ✅ | 2026-05-31 | 2026-05-31 | DevAgent | System audit PASS: C08 component Complete; all inline audits PASS; Decisions.md Actionable empty; build clean; all REQ-0022–0025 satisfied. Release v2.0.4 (minor: status bar feature). Ready to publish. |
 
 > **Status key:** ⬜ Not started · 🔄 In progress · ✅ Complete · 🔴 Blocked
 
@@ -50,7 +57,8 @@ license: Apache-2.0 (see LICENSE in project root)
 | C03 University Profile | ✅ | 2026-05-27 | 2026-05-27 | 2026-05-27 | 2026-05-27 | | Updated: workspacePath(), nested university paths, deleteUniversityProfile(), new buildUniversityProfile signature |
 | C04 Guidance Engine | ✅ | 2026-05-27 | 2026-05-27 | 2026-05-27 | 2026-05-27 | | Updated: timestamp param, dated dirs, listGuidance(), workspacePath() |
 | C05 Essay Advisor | ✅ | 2026-05-27 | 2026-05-27 | 2026-05-27 | 2026-05-27 | | Updated: timestamp param, dated dirs, listEssays(), workspacePath(), enquirer removed |
-| C06 PDF Exporter | ✅ | 2026-05-27 | 2026-05-27 | 2026-05-27 | 2026-05-27 | | No code changes needed — invocation model change handled entirely by C01 |
+| C06 PDF Exporter | ✅ | 2026-05-27 | 2026-05-31 (v2.0.3) | 2026-05-31 | 2026-05-31 | | v2.0.3: Browser installation assurance (F03); postinstall robustness; runtime fallback; error messages. `scripts/install-browsers.js`, `src/utils/ensure-browsers.ts` added. |
+| C08 Status Bar | ✅ | 2026-05-31 | 2026-05-31 (CHG-003) | 2026-05-31 | 2026-05-31 | | CHG-003 implementation complete. All 5 features (C08-F01–F05) implemented. Inline audit PASS (Definition of Done verified). Components: messageQueue.ts, statusFooter.tsx, messageLogModal.tsx, types.ts, index.ts. Build clean. |
 
 ---
 
@@ -65,6 +73,7 @@ license: Apache-2.0 (see LICENSE in project root)
 | 2026-05-25 | Deployment Readiness | C06 PDF Exporter | `puppeteer` missing from `package.json` dependencies caused clean-install build to fail (TS2307). Manifest patched: added `puppeteer@^23.11.1`; `postinstall` now installs both Playwright and Puppeteer Chromium binaries. Code and specs unchanged. Prior audit `rel_2026.05.25.1500` superseded by `rel_2026.05.25.1123`. | Manifest-only; no `./src/` or spec changes; first-install footprint grows by ~150 MB | D-TECH-AO000006 | A-EX-AOIDEATE1 |
 | 2026-05-25 | Development | C02 + C05 + shared tui.tsx | UX defect fix: "Back rendered as non-selectable separator" in C02. Resolution: enquirer fully removed from C02 and C05; shared `src/utils/tui.tsx` created with ink-based full-screen TUI (AppScreen, SpaciousSelect, waitForSelect/waitForText/waitForConfirm). C05 Essay Advisor migrated to tui.tsx helpers for consistent full-screen experience. | Moderate — new shared utility module; ink@7 + react@19 + @inkjs/ui@2 added as runtime deps; tsconfig + eslint updated for TSX; C02 renamed index.ts → index.tsx | D-PRODUCT-AO000001, D-TECH-AO000008, D-TECH-AO000009, D-TECH-AO000010 | — |
 | 2026-05-26 | Detailed Design (bug fix) | C02 + C05 + shared tui.tsx | Runtime crash reported post-v1.3.0-audit: selecting "Shadowing Experiences" or "Research Experiences" while resuming a legacy `profile.json` throws "Cannot read properties of undefined (reading 'map')" — missing array fields on older saves. Separate visual-contrast complaint on shared tui: dim text too low-contrast; highlighted row should invert to light-on-dark. Fix: generic-merge defaulting on JSON load + drop `dimColor` from hint/footer/inactive rows + black-bg/white-fg active row. v1.3.0 deployment paused. | Low-to-moderate — C02 load path gains a merge step; `tui.tsx` color treatment changes (affects C02 and C05); no schema/API change; new release will be v1.3.1 (patch). | D-PRODUCT-AO000002, D-PRODUCT-AO000003 | — |
+| 2026-05-31 | Deployment Readiness | C06 PDF Exporter + package.json | Deployment bug: `npm install -g university-admission-officer` fails to install Playwright/Puppeteer browsers → PDF export broken on first use. Root cause: postinstall script used inline shell commands with no error handling; failed silently during global install. Fix: robust Node-based postinstall (`scripts/install-browsers.js`) with timeout, error handling, CI/offline detection; runtime fallback (C06-F03 `ensureBrowsersInstalled()`) auto-installs if needed; clear error messages with manual fix instructions; documentation (`docs/BROWSER_INSTALLATION.md`). | Manifest + code — package.json postinstall updated; new files: `scripts/install-browsers.js`, `src/utils/ensure-browsers.ts`, `docs/BROWSER_INSTALLATION.md`; C06 gains F03 feature; C06 error messages enhanced. New release will be v2.0.3 (patch). | D-OPS-AO000001 | — |
 
 ---
 
@@ -91,7 +100,9 @@ license: Apache-2.0 (see LICENSE in project root)
 | v1.3.1 | [X] Active (Ready to Deploy) | 2026-05-26 | | Patch release — C02 resume-crash fix (generic-merge defaulting on profile.json load) + shared `tui.tsx` visual contrast fix (drop `dimColor` on hint/footer/inactive rows; invert active row to white-on-black). Affects C02 and C05. Audit `rel_2026.05.26.0943` PASS. |
 | v2.0.0 | [-] Superseded | 2026-05-27 | | Major release (CHG-002) — full menu-driven ink TUI; `university-ao/` workspace; nested university paths; dated guidance/essay dirs; Config screen; Back navigation; Delete with confirmation. `commander` + `enquirer` removed. 7 components. Audit `rel_2026.05.27.0710` PASS. Superseded by v2.0.1. |
 | v2.0.1 | [-] Superseded | 2026-05-27 | | Patch release — Config screen extended to display/edit all 4 Gemini env vars (`GEMINI_API_KEY`, `GEMINI_MODEL`, `GEMINI_TOKEN_WINDOW`, `GEMINI_CONTENT_BUDGET_PCT`). `saveConfig()` writes all 4. Default token window aligned to 1048576 across C03 and env.ts. Audit `rel_2026.05.27.0726` PASS. Superseded by v2.0.2. |
-| v2.0.2 | [X] Active (Ready to Deploy) | 2026-05-27 | | Patch release — View Profile/University in menus; Esc=Back on all screens; Esc on Student Select exits process (footer shows Ctrl+C); withSpinner on buildUniversityProfile/buildGuidance/buildEssay. Audit `rel_2026.05.27.0822` PASS. |
+| v2.0.2 | [-] Superseded | 2026-05-27 | | Patch release — View Profile/University in menus; Esc=Back on all screens; Esc on Student Select exits process (footer shows Ctrl+C); withSpinner on buildUniversityProfile/buildGuidance/buildEssay. Audit `rel_2026.05.27.0822` PASS. Superseded by v2.0.3. |
+| v2.0.3 | [-] Superseded | 2026-05-31 | | Patch release — Browser installation assurance: postinstall robustness (Node-based, timeout, error handling) + runtime fallback (C06-F03); documentation (BROWSER_INSTALLATION.md). npm install -g now reliably installs Puppeteer Chrome + Playwright Chromium; if postinstall fails, runtime auto-installs with clear error messages. Audit `rel_2026.05.31.prep` PASS. Superseded by v2.0.4. |
+| v2.0.4 | [X] Active (Ready to Deploy) | 2026-05-31 | | Minor release (CHG-003) — Persistent status bar footer: displays latest message from all operations (progress, warning, error, success) at absolute screen bottom. Full-screen message log modal (reverse-chronological with timestamps). Session-based queue clearing (on context change / menu return). Auto-clear on user action. New C08 component + 4 new requirements (REQ-0022–0025). Audit `rel_2026.05.31.c08` PASS. |
 
 ---
 

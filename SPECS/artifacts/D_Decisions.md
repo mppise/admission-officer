@@ -19,7 +19,7 @@ license: Apache-2.0 (see LICENSE in project root)
 
 | Total | Pending `[ ]` | Approved `[X]` | Rejected `[-]` | Deferred `[>]` |
 | :---: | :-----------: | :------------: | :------------: | :------------: |
-| 21 | 0 | 21 | 0 | 0 |
+| 26 | 0 | 26 | 0 | 0 |
 
 ---
 
@@ -27,7 +27,11 @@ license: Apache-2.0 (see LICENSE in project root)
 
 | Status | ID | Decision | Rationale | Alternatives Rejected | Impact | Owner | Notes |
 | :----: | :- | :------- | :-------- | :-------------------- | :----- | :---- | :---- |
-| `[X]` | D-ARCH-AO000001 | Six-component architecture: C01 CLI Shell, C02 Student Profile, C03 University Profile, C04 Guidance Engine, C05 Essay Advisor, C06 PDF Exporter | Clean separation of concerns; each command maps to one component | Monolithic single-file approach (unmaintainable), microservices (overkill for CLI) | All component specs must align to this decomposition | DevAgent | Confirmed during Planning |
+| `[X]` | D-ARCH-AO000001 | Seven-component architecture: C01 CLI Shell, C02 Student Profile, C03 University Profile, C04 Guidance Engine, C05 Essay Advisor, C06 PDF Exporter, **C08 Status Bar & Message Log** | Clean separation of concerns; status bar is a cross-cutting concern managed by dedicated component | Monolithic single-file approach (unmaintainable), messaging embedded in C01 (tight coupling), microservices (overkill for CLI) | All component specs must align to this decomposition; C08 integrates with C01–C07 | DevAgent | Updated CHG-003 — C08 added |
+| `[X]` | D-ARCH-AO000009 | **C08 exports global `postMessage(text, type)` function; all components import and call it directly** | Simplicity; no event bus complexity; tight integration with C08 state | Event emitter pattern (unnecessary indirection), React Context (adds dependency), callbacks (verbose) | C01–C07 each import `postMessage` from C08; C08 maintains in-memory queue and footer state | DevAgent | New — CHG-003, Design phase |
+| `[X]` | D-ARCH-AO000010 | **C08 message queue clears when user returns to main menu or changes student context** (session-based lifecycle) | Prevents stale messages cluttering logs; natural transition point aligns with user intent | Fixed queue size (arbitrary limit), never clear (unbounded memory), clear on every message (messages disappear too fast) | C01 calls `clearMessageLog()` when student context changes or user navigates back to root menu; C08 tracks context | DevAgent | New — CHG-003, Design phase |
+| `[X]` | D-ARCH-AO000011 | **Status bar footer is fixed at absolute screen bottom; menu reserves vertical space for it** | Footer always visible; predictable layout; menu scrolls independently above | Status bar overlays (obscures menu), menu pushes down (dynamic layout complexity) | tui.tsx integrates C08 footer component; menu height reduced by footer height | DevAgent | New — CHG-003, Design phase |
+| `[X]` | D-ARCH-AO000012 | **Full-screen message log modal accessible from status bar (press Enter); also accessible from main menu as peer to Config** | Maximum discoverability; both UI patterns work (footer-based for quick lookup, menu-based for consistency) | Status bar only (subtle, might be missed), menu only (breaks footer UX affordance) | C08 exports log modal component; C01 integrates both entry points; Enter key on footer triggers modal | DevAgent | New — CHG-003, Design phase |
 | `[X]` | D-ARCH-AO000002 | Prerequisite enforcement via menu flow structure — Guidance/Essay only reachable after university selected | Single structural enforcement point; no runtime flag checks needed | Each component checking independently (redundant), flag-based guards (superseded by CHG-002) | C04, C05 can omit prerequisite logic | DevAgent | Updated CHG-002 — originally flag-based; now menu-structural |
 | `[X]` | D-ARCH-AO000003 | Local-only file-backed persistence using markdown under `university-ao/` (process.cwd()-relative) | Student data is sensitive; no cloud requirement; markdown is human-readable | SQLite (overkill), cloud storage (out of scope), package-relative path (breaks global install) | No sync, no multi-device, no backup for MVP; workspace self-contained per working directory | DevAgent | Updated CHG-002 — path changed from `data/` to `university-ao/` |
 | `[X]` | D-ARCH-AO000004 | Google Gemini API for all AI generation (C03 extraction, C04 guidance, C05 essay) | Selected by DevAgent; natural language reasoning over structured profile data | OpenAI (not selected), rule/template engine (insufficient quality) | Requires internet + valid API key for C03, C04, C05 | DevAgent | Confirmed during Ideation |
@@ -73,6 +77,8 @@ license: Apache-2.0 (see LICENSE in project root)
 
 | Status | ID | Decision | Rationale | Alternatives Rejected | Impact | Owner | Notes |
 | :----: | :- | :------- | :-------- | :-------------------- | :----- | :---- | :---- |
+| `[X]` | D-OPS-AO000001 | Browser installation via `postinstall` script (`node scripts/install-browsers.js`) with runtime fallback (C06-F03 `ensureBrowsersInstalled()`) | Browsers fail to install during global `npm install` → CLI is broken on first use. Solution: robust postinstall (Node-based, timeout, error handling) + runtime fallback (auto-install on PDF export) + user documentation | Single postinstall failure (brittle), no fallback (bad UX) | C06 gains F03 runtime installation attempt; package.json gains `scripts/` and `docs/BROWSER_INSTALLATION.md` in files list; postinstall timeout is 5 min per browser | DevAgent | Bug fix v2.0.3 — postinstall script fails silently in some environments |
+| :----: | :- | :------- | :-------- | :-------------------- | :----- | :---- | :---- |
 
 ## Compliance & Legal
 
@@ -97,3 +103,5 @@ license: Apache-2.0 (see LICENSE in project root)
 | CHG-003 | D-PRODUCT-AO000002, D-PRODUCT-AO000003 added for C02 bug fix (resume crash on F06/F07; tui.tsx visual contrast) | 2026-05-26 | SpecGantry |
 | CHG-004 | CHG-002 menu-driven overhaul: D-ARCH-AO000002-008 added/updated; D-TECH-AO000002/003/008-010 updated; commander and enquirer removed; ink/tui.tsx promoted to system-wide; university-ao/ workspace; dated dirs; Config screen | 2026-05-27 | SpecGantry |
 | CHG-005 | D-PRODUCT-AO000004-006 added for v2.0.2 bug fixes: View Profile/University menus; Esc=Back with process.exit on Student Select; withSpinner for long-running AI calls | 2026-05-27 | SpecGantry |
+| CHG-006 | D-OPS-AO000001 added for v2.0.3 bug fix: postinstall script robustness + runtime browser installation fallback (C06-F03) | 2026-05-31 | DevAgent |
+| CHG-007 | D-ARCH-AO000009–012 added for CHG-003 Design phase: C08 component, global postMessage API, session-based queue clearing, fixed footer layout, dual-access log modal | 2026-05-31 | DevAgent |

@@ -3,6 +3,7 @@ import { marked } from 'marked';
 import { promises as fs } from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { ensureBrowsersInstalled } from '../../utils/ensure-browsers.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 // CSS is copied to dist/components/c06-pdf-exporter/styles/ at build time (see package.json build script)
@@ -43,16 +44,25 @@ ${htmlBody}
 // [C06-F02] Render HTML to PDF via Puppeteer
 async function renderPdf(htmlContent: string, pdfPath: string): Promise<void> {
   let browser;
+  let browserStarted = false;
+
   try {
     browser = await puppeteer.launch({ headless: true });
-  } catch {
-    // Retry once
-    await new Promise(r => setTimeout(r, 5000));
+    browserStarted = true;
+  } catch (err) {
+    // Browser launch failed - ensure browsers are installed and retry
+    console.log('Browser not ready, installing...');
     try {
+      await ensureBrowsersInstalled();
       browser = await puppeteer.launch({ headless: true });
+      browserStarted = true;
     } catch (retryErr) {
-      const msg = retryErr instanceof Error ? retryErr.message : String(retryErr);
-      throw new Error(`PDF export failed: browser could not start. ${msg}`);
+      const errMsg = retryErr instanceof Error ? retryErr.message : String(retryErr);
+      throw new Error(
+        `PDF export failed: could not launch browser. Please ensure Puppeteer Chrome is installed.\n` +
+        `Try running: npx puppeteer browsers install chrome\n` +
+        `Error: ${errMsg}`
+      );
     }
   }
 
@@ -71,7 +81,9 @@ async function renderPdf(htmlContent: string, pdfPath: string): Promise<void> {
       throw new Error(`PDF export failed: could not write to ${pdfPath}. ${msg}`);
     }
   } finally {
-    await browser.close();
+    if (browserStarted && browser) {
+      await browser.close();
+    }
   }
 }
 

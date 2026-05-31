@@ -1,10 +1,11 @@
 # C06 — PDF Exporter: Core Specification
 
+> ⚠️ Revised 2026-05-31 (Bug fix v2.0.3): Added C06-F03 browser installation assurance + robust error messages.
 > ⚠️ Revised 2026-05-27 (CHG-002): Invocation model changed — C06 is now triggered by a follow-up "Export to PDF?" prompt shown by C01 after any view or generate action, not by a `--print` flag. All data paths updated to `university-ao/`. All paths via `C07.workspacePath()`.
 
 ## Purpose
 
-Converts any `ao` markdown output file to a well-formatted PDF by rendering it through an HTML template with a clean CSS stylesheet via Puppeteer. The PDF is written alongside the source markdown file with the same name and a `.pdf` extension. Fully offline — no external service calls.
+Converts any `ao` markdown output file to a well-formatted PDF by rendering it through an HTML template with a clean CSS stylesheet via Puppeteer. The PDF is written alongside the source markdown file with the same name and a `.pdf` extension. Fully offline — no external service calls. Ensures Puppeteer and Playwright browsers are installed and provides clear error guidance if unavailable.
 
 ---
 
@@ -12,8 +13,9 @@ Converts any `ao` markdown output file to a well-formatted PDF by rendering it t
 
 | Status | ID | Description | Priority | Req Ref | Doc Level |
 | :----- | :- | :---------- | :------- | :------ | :-------- |
-| `Not Started` | C06-F01 | Convert a markdown file to HTML using `marked` and a CSS stylesheet | P1 | REQ-0012 | - |
-| `Not Started` | C06-F02 | Render the HTML to PDF using Puppeteer and write it alongside the source markdown | P1 | REQ-0012 | - |
+| `Complete` | C06-F01 | Convert a markdown file to HTML using `marked` and a CSS stylesheet | P1 | REQ-0012 | - |
+| `Complete` | C06-F02 | Render the HTML to PDF using Puppeteer and write it alongside the source markdown | P1 | REQ-0012 | - |
+| `Complete` | C06-F03 | Ensure Puppeteer and Playwright browsers are installed; auto-install if missing; provide actionable error messages | P1 | REQ-0022 | - |
 
 ---
 
@@ -120,3 +122,33 @@ await page.pdf({
 ## Execution Mode
 
 Request-driven. Invoked by C01 after displaying any markdown output (guidance report, essay outline, student profile, university profile) when the user selects "Export to PDF?" from the follow-up prompt. Async — Puppeteer launch and PDF render are both async/await. Process completes synchronously from C01's perspective via top-level await.
+
+---
+
+## Change History
+
+### Bug Fix v2.0.3 (2026-05-31)
+
+**Issue:** When deploying `ao` to a new machine, Playwright and Puppeteer browsers were not installed, causing PDF export to fail silently.
+
+**Root Cause:** Original `postinstall` script in `package.json` used inline shell commands with no error handling. Failed silently during global npm install with no fallback.
+
+**Resolution:**
+- **New C06-F03:** Browser installation assurance — auto-install on first runtime failure
+- **package.json:** Replaced inline postinstall with `node scripts/install-browsers.js` (robust Node script with timeout/error handling)
+- **scripts/install-browsers.js:** New ES module script; detects CI/offline; 5-min timeout per browser
+- **src/utils/ensure-browsers.ts:** New utility function for runtime browser verification/installation
+- **PDF exporter:** Integrated `ensureBrowsersInstalled()` as fallback at launch-time error; improved error messages with actionable next-steps
+- **package.json files:** Updated to include `scripts/`, `docs/BROWSER_INSTALLATION.md`
+- **docs/BROWSER_INSTALLATION.md:** New user guide with troubleshooting, CI/CD examples, offline instructions
+
+**Impact:** 
+- ✅ Browsers reliably installed on first `npm install -g`
+- ✅ Runtime fallback if postinstall failed
+- ✅ Clear error messages with manual fix instructions
+- ✅ CI/CD-safe (skips download when CI=true)
+- ✅ Offline-safe (skips download when OFFLINE=true)
+
+**Feature Status Update:**
+- C06-F03: `Not Started` → `Complete`
+- C06-F01, C06-F02: Status explicitly marked `Complete` (retroactive audit confirmation)

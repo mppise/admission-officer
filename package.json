@@ -1,6 +1,6 @@
 {
   "name": "university-admission-officer",
-  "version": "2.0.2",
+  "version": "2.0.4",
   "description": "Admissions Officer CLI — personalised college admissions guidance for high school students",
   "type": "module",
   "bin": {
@@ -12,11 +12,13 @@
     "start": "node dist/components/c01-cli-shell/index.js",
     "typecheck": "tsc --noEmit",
     "lint": "eslint src/**/*.ts src/**/*.tsx",
-    "postinstall": "playwright install chromium && puppeteer browsers install chrome"
+    "postinstall": "node scripts/install-browsers.js"
   },
   "files": [
     "dist/",
-    "README.md"
+    "scripts/",
+    "README.md",
+    "docs/BROWSER_INSTALLATION.md"
   ],
   "keywords": [
     "college-admissions",
