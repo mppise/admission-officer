@@ -1,7 +1,7 @@
-import { spawn } from 'child_process';
+import { spawn, execFile as execFileCallback } from 'child_process';
 import { promisify } from 'util';
 
-const execFile = promisify(require('child_process').execFile);
+const execFile = promisify(execFileCallback);
 
 /**
  * Ensure required browsers are installed before first use.
