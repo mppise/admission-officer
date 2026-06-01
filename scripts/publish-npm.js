@@ -34,7 +34,7 @@ function exec(cmd, opts = {}) {
       stdio: silent ? 'pipe' : 'inherit',
       encoding: 'utf-8',
     })
-    return result.trim()
+    return result ? result.trim() : ''
   } catch (err) {
     if (failOnError) {
       log(`Command failed: ${cmd}`, 'error')
@@ -131,7 +131,7 @@ async function publish() {
     // Step 8: Push to git
     log('Pushing to git...', 'info')
     exec('git push origin main')
-    exec('git push origin v${newVersion}')
+    exec(`git push origin v${newVersion}`)
     log('Pushed to git', 'success')
     console.log()
 
