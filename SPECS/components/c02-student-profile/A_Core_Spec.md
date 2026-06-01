@@ -1,87 +1,108 @@
 ---
-name: c02-core-spec
-description: Core spec for C02 Student Profile — features and requirements traceability
+name: c02-student-profile-core
+description: C02 Student Profile Builder — Feature specification
 ---
 
-# C02 Student Profile — Core Specification
+Architecture refs: 0_Overview.md, 3_Data.md
 
-**Component:** Student Profile Builder  
-**Purpose:** Build, view, edit, delete structured student academic and achievement profiles  
-**Status:** Ready (design complete, implementation in progress)
+# C02 — Student Profile Builder: Core Specification
 
 ---
 
 ## Features
 
 | Feature ID | Description | Status | Req Ref |
-|:---|:---|:---|:---|
-| C02-F01 | Interactive form to create new student profile (name, grad year, high school, intended majors) | Ready | REQ-0001 |
-| C02-F02 | Form fields for academic record (GPA weighted/unweighted, class rank, transcript by year) | Ready | REQ-0001 |
-| C02-F03 | Form fields for test scores (SAT, ACT, AP, IB) | Ready | REQ-0001 |
-| C02-F04 | Form fields for extracurriculars, awards, shadowing, research entries | Ready | REQ-0001 |
-| C02-F05 | Persist profile to JSON after every field change (live saves) | Ready | REQ-0001 |
-| C02-F06 | Export profile to human-readable markdown with Gemini enhancement | Ready | REQ-0001 |
-| C02-F07 | View existing student profile (display name, GPA, intended majors, summary) | Ready | REQ-0002 |
-| C02-F08 | Edit existing student profile (select field, update, re-save) | Ready | REQ-0002 |
-| C02-F09 | Delete student profile (confirm, remove directory) | Ready | REQ-0003 |
-| C02-F10 | List all students (show name, grad year, created date) | Ready | REQ-0001, REQ-0002 |
+| :--------- | :---------- | :----- | :------ |
+| C02-F01 | Capture academic profile (GPA, class rank, transcript by year) | Ready | REQ-0002 |
+| C02-F02 | Capture test scores (SAT, ACT, AP, IB) | Ready | REQ-0002 |
+| C02-F03 | Capture extracurriculars (activity, role, hours/week, years) | Ready | REQ-0002 |
+| C02-F04 | Capture awards, shadowing, research entries | Ready | REQ-0002 |
+| C02-F05 | Persist profile to JSON; generate readable markdown summary | Ready | REQ-0010 |
 
 ---
 
 ## Acceptance Criteria
 
-### C02-F01–F04: Form Intake
-- [ ] Each field displays prompt and accepts user input
-- [ ] Field validation: GPA range 0.0–4.0+, graduation year valid, major names non-empty
-- [ ] User can skip optional fields
-- [ ] Navigation: arrow keys to move between fields, Escape to save and exit
+### C02-F01: Academic Profile
 
-### C02-F05: Live Persistence
-- [ ] JSON updated in workspace/students/{slug}/profile.json after every field change
-- [ ] No data loss on interrupted session
-- [ ] fieldStatus tracks which fields are 'set', 'pending', or 'skipped'
+- [ ] Capture: Name, graduation year, high school, intended majors
+- [ ] Prompt for GPA (weighted + unweighted), class rank
+- [ ] Collect transcript: year by year, courses with grades (letter or percentage)
+- [ ] Validate: GPA as decimal 0–4.0 (or allow extended for weighted), rank as integer or percentile
+- [ ] User can skip fields; field status tracked (pending/set/skipped)
+- [ ] Markdown output is human-readable (e.g., "**GPA:** 3.8 (weighted), 3.6 (unweighted)")
 
-### C02-F06: Markdown Export
-- [ ] Calls Gemini with c02-profile-enhance.prompt.md to generate markdown summary
-- [ ] Output includes sections: Overview, Academic Record, Test Scores, Achievements, Major-Specific Notes
-- [ ] Written to workspace/students/{slug}/profile.md
-- [ ] Readable by C04/C05 as-is
+### C02-F02: Test Scores
 
-### C02-F07–F08: View/Edit
-- [ ] View shows formatted student name, GPA, majors, key achievements
-- [ ] Edit allows selecting field and changing value
-- [ ] Changes persisted immediately (C02-F05)
+- [ ] Capture: SAT (total + math/reading breakdown), ACT (composite), AP scores (subject + score), IB scores
+- [ ] Validate: SAT 400–1600, ACT 1–36, AP 1–5, IB 1–7
+- [ ] User can add multiple AP/IB entries
+- [ ] Field status tracked separately for each test type
+- [ ] Markdown lists all scores with subjects
 
-### C02-F09: Delete
-- [ ] Confirmation prompt: "Delete student [name]? This cannot be undone."
-- [ ] On confirm: Remove entire directory workspace/students/{slug}/
-- [ ] On cancel: Return to menu
+### C02-F03: Extracurriculars
 
-### C02-F10: List Students
-- [ ] Lists all student directories with name, grad year, creation date
-- [ ] Sorted alphabetically by name
-- [ ] User can select to view/edit
+- [ ] Capture: Activity name, role, years involved, hours/week, description (optional)
+- [ ] User can add 0–20+ extracurriculars
+- [ ] Validate: Activity name not empty, hours/week as integer
+- [ ] Field status: extracurriculars section is "set" if ≥1 entry, else "pending"
+- [ ] Markdown outputs table: Activity | Role | Time Commitment | Description
 
----
+### C02-F04: Awards, Shadowing, Research
 
-## Data Persistence
+- [ ] Awards: Award name, level (school/state/national), year, description
+- [ ] Shadowing: Organization, field, total hours, period (e.g., "Summer 2023"), description
+- [ ] Research: Project title, institution, mentor, period, hours/week, description
+- [ ] User can add 0+ of each type
+- [ ] Markdown outputs separate sections for each category
 
-**JSON Schema:** See Architecture/3_Data.md
+### C02-F05: Persistence
 
-**Paths:**
-- `{workspace}/students/{slug}/profile.json` — structured data
-- `{workspace}/students/{slug}/profile.md` — markdown export
-- `{slug}` — kebab-case from student name (e.g., "Alice Johnson" → "alice-johnson")
-
-**Updates:**
-- JSON: every field change (sync write)
-- Markdown: after all fields collected or on explicit export (async, via Gemini)
+- [ ] Save to JSON: `university-ao/students/<slug>/profile.json` (complete data)
+- [ ] Save to Markdown: `university-ao/students/<slug>/profile.md` (human-readable)
+- [ ] JSON includes metadata: `generatedDate` (ISO 8601), `lastUpdated` (ISO 8601), `fieldStatus` (all fields)
+- [ ] Markdown is formatted for readability (headers, tables, bullet lists)
+- [ ] Round-trip: JSON → Markdown → (edit in text editor) → JSON must preserve all data
+- [ ] Overwrite detection: If profile exists, ask user before overwriting
 
 ---
 
-## Design Notes
+## Data Model
 
-- **Form library:** Custom TUI using Ink + TextInput + SpaciousSelect (utils/tui.tsx)
-- **Validation:** Client-side in component; server-side validation not applicable (local-only)
-- **Markdown generation:** Uses loadPrompt('c02-profile-enhance', {...params}) with student data substituted
-- **Error recovery:** If Gemini call fails, user can retry or skip markdown generation
+```typescript
+interface TranscriptYear {
+  yearLabel: string; // e.g., "Freshman", "10th Grade"
+  courses: Array<{ name: string; grade: string }>;
+}
+
+interface ProfileData {
+  name: string;
+  gradYear: string;
+  highSchool: string;
+  intendedMajors: string[];
+  gpaWeighted: string;
+  gpaUnweighted: string;
+  classRank: string;
+  transcript: TranscriptYear[];
+  sat: { total: string; math: string; reading: string };
+  act: { composite: string };
+  apScores: Array<{ subject: string; score: string }>;
+  ibScores: Array<{ subject: string; score: string }>;
+  extracurriculars: Extracurricular[];
+  awards: Award[];
+  shadowing: ShadowingEntry[];
+  research: ResearchEntry[];
+  generatedDate: string; // ISO 8601
+  lastUpdated: string;
+  fieldStatus: Record<string, FieldStatus>; // pending | set | skipped
+}
+```
+
+---
+
+## Error Handling
+
+- [ ] Invalid GPA → show error, re-prompt
+- [ ] Empty activity name → show error, re-prompt
+- [ ] Duplicate major → warn, allow or dedupe
+- [ ] File write failure → show error with disk space suggestion

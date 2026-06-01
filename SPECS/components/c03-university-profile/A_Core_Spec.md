@@ -1,115 +1,99 @@
 ---
-name: c03-core-spec
-description: Core spec for C03 University Profile — features and requirements
+name: c03-university-profile-core
+description: C03 University Profile Builder — Feature specification
 ---
 
-# C03 University Profile — Core Specification
+Architecture refs: 0_Overview.md, 1_Stack.md
 
-**Component:** University Profile Builder  
-**Purpose:** Web scraping + AI-powered extraction of university mission, culture, programs, and ideal candidate traits  
-**Status:** Ready (design complete, implementation in progress)
+# C03 — University Profile Builder: Core Specification
 
 ---
 
 ## Features
 
 | Feature ID | Description | Status | Req Ref |
-|:---|:---|:---|:---|
-| C03-F01 | Web scraping via Playwright: fetch pages from target university website | Ready | REQ-0005 |
-| C03-F02 | Batch AI extraction via Gemini: extract mission, culture, programs, ideal student traits from page text | Ready | REQ-0006 |
-| C03-F03 | Token budgeting: limit batch size to respect GEMINI_TOKEN_WINDOW and GEMINI_CONTENT_BUDGET_PCT | Ready | REQ-0006 |
-| C03-F04 | Major-scoped scraping: identify program-specific pages based on student's intended majors, prioritize them | Ready | REQ-0007 |
-| C03-F05 | Cost estimation: predict and display Gemini API cost before scraping | Ready | REQ-0006 |
-| C03-F06 | Progress updates: display scraping progress (pages completed, LLM calls made, tokens consumed) | Ready | REQ-0006 |
-| C03-F07 | Persist scraped + extracted data to JSON and markdown | Ready | REQ-0006 |
-| C03-F08 | View university profile (display name, mission, ideal student traits, program notes) | Ready | REQ-0005 |
-| C03-F09 | Delete university profile (confirm, remove directory) | Ready | REQ-0005 |
-| C03-F10 | List all universities for a student | Ready | REQ-0005 |
+| :--------- | :---------- | :----- | :------ |
+| C03-F01 | Web scraping (Playwright crawl up to 100 pages) | Ready | REQ-0003 |
+| C03-F02 | Page content extraction and tokenization | Ready | REQ-0003 |
+| C03-F03 | Batch AI extraction (Gemini) | Ready | REQ-0004 |
+| C03-F04 | University profile persistence (JSON + Markdown) | Ready | REQ-0004 |
+| C03-F05 | Cost estimation and token tracking | Ready | REQ-0012 |
 
 ---
 
 ## Acceptance Criteria
 
 ### C03-F01: Web Scraping
-- [ ] Playwright launches headless Chromium
-- [ ] Fetches pages from target university domain (e.g., mit.edu, stanford.edu)
-- [ ] Respects robots.txt and user-agent headers
-- [ ] Handles JavaScript-heavy pages (waits for networkidle0)
-- [ ] Timeout: 30s per page, max 100 pages per university
-- [ ] Graceful failure: skip page if fetch fails, log failure, continue
 
-### C03-F02: Batch Extraction
-- [ ] Categorizes page text by category: Identity & Mission, Academic, Admissions, Student Experience, Ideal Student, Program: {major}
-- [ ] Calls Gemini c03-university-extract.prompt.md (per category)
-- [ ] Extracts facts: mission statement, culture, academic specialties, notable programs, ideal candidate traits, major-specific notes
-- [ ] Output: structured JSON with category keys
+- [ ] Accept university URL from user
+- [ ] Crawl up to 100 pages using Playwright (chromium)
+- [ ] Follow internal links only; skip external domains
+- [ ] Extract text content from each page (ignore scripts, styles, navigation)
+- [ ] Handle timeouts (per-page: 10s, total crawl: 5 min)
+- [ ] Show progress: "Page 5/47 crawled, extracting text..." on C08 status bar
+- [ ] Store page URLs + text in memory during crawl
 
-### C03-F03: Token Budgeting
-- [ ] Reads GEMINI_TOKEN_WINDOW and GEMINI_CONTENT_BUDGET_PCT from env
-- [ ] Computes character budget: tokenWindow × (budgetPct / 100) × 4
-- [ ] Groups pages into batches: fit as many page texts as possible per batch
-- [ ] If single page exceeds budget: truncate to TRUNCATE_CHARS (4000 chars)
-- [ ] Retry logic: if Gemini rejects batch due to token limit, resend with truncated pages
+### C03-F02: Page Content Extraction
 
-### C03-F04: Major-Scoped Scraping
-- [ ] Reads student's intendedMajors from student profile
-- [ ] Prioritizes pages: main university pages first, then major-specific pages
-- [ ] Search URLs for major keywords (e.g., "computer-science", "engineering")
-- [ ] Scrape program pages if found; fallback to general pages if not
+- [ ] Tokenize content: estimate Gemini token count per page using `text.length * 4` approximation
+- [ ] Batch pages into chunks that fit within `GEMINI_CONTENT_BUDGET_PCT` of token window
+- [ ] Example: 1M token window, 60% budget → 600k tokens available → ~150k chars → ~30 avg pages per batch
+- [ ] Validate: No single page truncated to < 1000 chars (preserve context)
 
-### C03-F05: Cost Estimation
-- [ ] Before scraping: estimate number of pages, estimated tokens (per page ~500 chars)
-- [ ] Use MODEL_PRICING table: map model name to $/M tokens
-- [ ] Display: "Estimated cost: ~$0.50 (based on 500 pages × 2 batches)"
-- [ ] User can proceed or cancel
+### C03-F03: Batch AI Extraction
 
-### C03-F06: Progress Updates
-- [ ] Real-time status: "Scraping... 23/100 pages complete"
-- [ ] "Extracting... batch 3 of 5, 45,000 tokens used"
-- [ ] "Extraction complete. 234,567 input tokens, 45,678 output tokens used. Cost: ~$0.42"
+- [ ] For each batch, send to Gemini: "Extract key facts about university culture, mission, academics, ideal student profile, etc."
+- [ ] Parse Gemini response into structured facts (5 static categories + dynamic program-specific notes)
+- [ ] Store results incrementally in memory; persist after all batches complete
+- [ ] Retry on Gemini timeout (max 1 retry)
 
-### C03-F07: Persistence
-- [ ] JSON: workspace/students/{slug}/universities/{uni_slug}/profile.json
-- [ ] Markdown: workspace/students/{slug}/universities/{uni_slug}/profile.md
-- [ ] Incremental updates: if scraping interrupted, resume from last successful page
+### C03-F04: Persistence
 
-### C03-F08–F10: View/Delete/List
-- [ ] View: display university name, mission summary, ideal student traits, program notes
-- [ ] Delete: confirmation prompt, remove directory
-- [ ] List: show all universities for student, sorted by name
+- [ ] Save to `university-ao/students/<student_slug>/universities/<uni_slug>/profile.json` (structured)
+- [ ] Save to `university-ao/students/<student_slug>/universities/<uni_slug>/profile.md` (human-readable)
+- [ ] JSON includes metadata: university name, tagline, crawl stats (pages crawled, failures, tokens spent)
+- [ ] Markdown formatted as readable summary with sections per category
+
+### C03-F05: Cost Tracking
+
+- [ ] Estimate Gemini cost based on input/output tokens + model pricing table
+- [ ] Display to user: "Estimated cost: ~$0.47 for this university" before confirmation
+- [ ] Log actual token counts after API call (for later audit)
+- [ ] Warn if estimated cost > $5 (sign of misconfiguration)
 
 ---
 
-## Data Persistence
+## Data Model
 
-**Profile JSON structure:**
 ```typescript
 interface UniversityProfileData {
-  universityName: string
-  tagline: string | null
-  coreValues: string[]
-  mission: string
-  culture: string
-  academicSpecialties: string[]
-  notablePrograms: string[]
-  idealCandidateTraits: string[]
-  campusEthos: string
-  majorSpecificNotes: Record<string, string | null>
+  universityName: string;
+  tagline: string | null;
+  coreValues: string[];
+  mission: string;
+  culture: string;
+  academicSpecialties: string[];
+  notablePrograms: string[];
+  idealCandidateTraits: string[];
+  campusEthos: string;
+  majorSpecificNotes: Record<string, string | null>; // "Computer Science" -> "..."
 }
-```
 
-**Incremental state (during scraping):**
-```typescript
-interface ProfileJson {
-  pages: Array<{ url: string; status: 'scraped' | 'done'; text?: string }>
-  [category: string]: any
+interface RunStats {
+  urlsScanned: number;
+  urlsFailed: number;
+  urlsSkipped: number;
+  llmCalls: number;
+  totalInputTokens: number;
+  totalOutputTokens: number;
 }
 ```
 
 ---
 
-## Design Notes
+## Error Handling
 
-- **Scraping robustness:** Playwright + retry logic for transient failures
-- **Token budgeting:** GEMINI_TOKEN_WINDOW default 1048576, GEMINI_CONTENT_BUDGET_PCT default 60
-- **Model pricing:** Supports gemini-2.5-pro, 2.0-flash, 1.5-flash, 1.5-pro, etc.; add new models to MODEL_PRICING
+- [ ] Crawl timeout → show partial results, offer continue or abort
+- [ ] Gemini token limit exceeded → truncate batch, retry with smaller batch
+- [ ] Invalid URL → show error, re-prompt
+- [ ] Network error during crawl → retry current page (max 2x), skip if fails

@@ -17,7 +17,7 @@ export const StatusFooter: React.FC<StatusFooterProps> = ({ currentMessage, onEn
 
   if (!currentMessage) {
     return (
-      <Box borderStyle="round" borderColor="gray" width="100%" height={2}>
+      <Box borderStyle="round" borderColor="gray" width="100%" height={2} backgroundColor="gray">
         <Box width="100%" paddingX={1}>
           <Text dimColor>(no messages)</Text>
         </Box>
@@ -41,7 +41,7 @@ export const StatusFooter: React.FC<StatusFooterProps> = ({ currentMessage, onEn
   }
 
   return (
-    <Box borderStyle="round" borderColor="gray" width="100%" height={2}>
+    <Box borderStyle="round" borderColor="gray" width="100%" height={2} backgroundColor="gray">
       <Box width="100%" paddingX={1}>
         <Text>{displayText}</Text>
       </Box>

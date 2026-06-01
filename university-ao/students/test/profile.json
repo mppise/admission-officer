@@ -1,0 +1,46 @@
+{
+  "name": "Test",
+  "gradYear": "",
+  "highSchool": "",
+  "intendedMajors": [],
+  "gpaWeighted": "",
+  "gpaUnweighted": "",
+  "classRank": "",
+  "transcript": [],
+  "sat": {
+    "total": "",
+    "math": "",
+    "reading": ""
+  },
+  "act": {
+    "composite": ""
+  },
+  "apScores": [],
+  "ibScores": [],
+  "extracurriculars": [],
+  "awards": [],
+  "shadowing": [],
+  "research": [],
+  "generatedDate": "2026-06-01",
+  "lastUpdated": "2026-06-01",
+  "fieldStatus": {
+    "name": "set",
+    "gradYear": "skipped",
+    "highSchool": "skipped",
+    "intendedMajors": "skipped",
+    "gpaWeighted": "skipped",
+    "gpaUnweighted": "skipped",
+    "classRank": "skipped",
+    "transcript": "skipped",
+    "satTotal": "skipped",
+    "satMath": "skipped",
+    "satReading": "skipped",
+    "actComposite": "skipped",
+    "apScores": "skipped",
+    "ibScores": "skipped",
+    "extracurriculars": "skipped",
+    "awards": "skipped",
+    "shadowing": "skipped",
+    "research": "skipped"
+  }
+}

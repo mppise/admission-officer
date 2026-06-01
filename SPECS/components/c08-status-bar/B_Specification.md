@@ -1,100 +1,105 @@
 ---
-name: c08-spec
-description: Implementation specification for C08 Status Bar
+name: c08-status-bar-impl
+description: C08 Status Bar & Message Log — Implementation specification
 ---
 
-# C08 Status Bar — Implementation Specification
+# C08 — Status Bar & Message Log: Implementation Specification
 
 ---
 
-## 1. Interfaces
+## Interfaces
 
 ```typescript
-interface StatusMessage {
-  id: string
-  text: string
-  timestamp: Date
-  status: 'pending' | 'done' | 'error'
+export interface Message {
+  text: string;
+  type: MessageType; // 'info' | 'warn' | 'error' | 'success'
+  timestamp: string; // ISO 8601
+  source?: string; // e.g., "C03 University Profiler"
 }
 
-export function enqueueMessage(text: string, status?: 'pending' | 'done' | 'error'): void
-export function dequeueMessage(id: string): StatusMessage | undefined
-export function flushQueue(): void
-export function getQueue(): StatusMessage[]
-export function showMessageModal(): void
-export function hideMessageModal(): void
+export function postMessage(text: string, type: MessageType, source?: string): void;
+export function clearMessageLog(context: 'context-change' | 'menu-return'): void;
+export function getAllMessages(): Message[];
+export function getCurrentMessage(): Message | null;
+export function openMessageLogModal(): Promise<void>;
+
+export const MESSAGE_TYPE_ICONS: Record<MessageType, string> = {
+  'info': 'ℹ️',
+  'warn': '⚠️',
+  'error': '✗',
+  'success': '✓',
+};
 ```
 
 ---
 
-## 2. Message Queue Implementation
-
-**Singleton instance:** messageQueue (module-level variable)
+## In-Memory Message Queue
 
 ```typescript
-const messageQueue: StatusMessage[] = []
-const MAX_VISIBLE = 5
-
-function enqueueMessage(text: string, status: 'pending' | 'done' | 'error' = 'pending') {
-  const msg: StatusMessage = {
-    id: generateId(),
-    text,
-    timestamp: new Date(),
-    status,
-  }
-  messageQueue.push(msg)
-  if (messageQueue.length > MAX_VISIBLE) {
-    messageQueue.shift() // Drop oldest
-  }
-  // Trigger re-render via setState in React component
+interface MessageQueue {
+  messages: Message[];
+  currentIndex: number; // Index of displayed message
+  maxSize: number; // 100
 }
 ```
 
 ---
 
-## 3. Rendering
+## Footer Rendering
 
-**Component:** statusFooter.tsx
+```
+┌─────────────────────────────────────────────────────────────────────────┐
+│ ✓ Guidance generated for Stanford University                             │
+│ [Press Enter to see full log] › C04 Guidance Engine                      │
+└─────────────────────────────────────────────────────────────────────────┘
+```
 
-- Renders at bottom of AppScreen
-- Shows current message (most recent, or "Ready" if empty)
-- Color: green for 'done', yellow for 'pending', red for 'error'
-- Text: max 100 chars (truncate with "...")
-
-**Component:** messageLogModal.tsx
-
-- Overlay modal showing full message history
-- Timestamp, status color, full text
-- Toggle with Ctrl+M keyboard shortcut
-- Dismiss with Escape
+- **Line 1:** Icon + current message (truncated to 70 chars)
+- **Line 2:** Help text + source component
 
 ---
 
-## 4. Integration Points
+## Message Log Modal
 
-**Emitted by:**
-- C03 (buildUniversityProfile): "Scraping... 23/100 pages", "Extracting... batch 2 of 5"
-- C04 (buildGuidance): "Generating guidance...", "✓ Guidance complete"
-- C05 (buildEssay): "Generating essay outline...", "✓ Essay ready"
-- C06 (exportToPdf): "Rendering PDF...", "✓ PDF exported"
-
-**Lifecycle:**
-- Operation start: enqueueMessage("Operation...", 'pending')
-- Intermediate progress: enqueueMessage("Operation... 50% complete", 'pending')
-- Success: enqueueMessage("✓ Operation complete", 'done')
-- Error: enqueueMessage("✗ Operation failed: [reason]", 'error')
-- Auto-clear: Remove 'done' messages after 10 seconds
+```
+┌─────────── Message Log ──────────────┐
+│ 12:45:23 [info] C03: Crawling page 5 │
+│ 12:44:58 [info] C03: Scraped 47 pages │
+│ 12:44:15 [success] C03: Profile saved │
+│ 12:43:50 [error] C03: Network timeout │
+│ ↑/↓ scroll, Esc close                 │
+└───────────────────────────────────────┘
+```
 
 ---
 
-## 5. Testing
+## Error Handling
 
-**Critical path:** Enqueue → render footer → modal shows → dismiss
+| Error | Recovery |
+| :----- | :------- |
+| Message text > 1000 chars | Truncate: `text.slice(0, 1000) + "..."` |
+| Queue overflow (100+) | Discard oldest message |
+| Very long source name | Abbreviate to "C##" format |
 
 ---
 
-## 6. Changes & Revisions
+## Operational Requirements
 
-| Date | Description |
-|:---|:---|
-| 2026-05-31 | Initial spec |
+- **Timing:** postMessage is synchronous, non-blocking (returns immediately)
+- **Display update:** Status footer updated on next render cycle (non-blocking)
+- **Memory:** Queue never exceeds 100 messages
+- **Terminal:** Assume minimum 80×24; footer uses 2 lines, modal uses 8–10 lines
+
+---
+
+## Testing Requirements
+
+**Coverage:** 80% line coverage.
+
+**Critical paths:**
+- [ ] postMessage with all 4 types → correct icons, messages appear
+- [ ] Message log modal → shows all messages, navigable
+- [ ] Clear log → messages removed
+- [ ] Queue overflow → oldest discarded, newest retained
+- [ ] Very long message → truncated with "..."
+- [ ] Footer updates non-blocking → doesn't freeze menu

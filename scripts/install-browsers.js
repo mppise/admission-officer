@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /**
  * Install browser binaries for Playwright and Puppeteer.
- * Runs after npm install with robust error handling and retry logic.
+ * Runs after npm install with robust error handling.
  * Can be safely skipped in CI/CD or offline environments.
  */
 
@@ -45,22 +45,26 @@ async function main() {
   try {
     await runCommand(
       'npx',
-      ['playwright', 'install', 'chromium'],
-      'Playwright Chromium'
-    );
-
-    await runCommand(
-      'npx',
       ['puppeteer', 'browsers', 'install', 'chrome'],
       'Puppeteer Chrome'
     );
-
+    await runCommand(
+      'npx',
+      ['playwright', 'install', 'chromium'],
+      'Playwright Chromium'
+    );
     console.log('✓ Browser installation complete');
     process.exit(0);
   } catch (err) {
-    console.error('Fatal error during browser installation:', err);
-    process.exit(1);
+    console.warn(`⚠ Browser installation encountered an error: ${err}`);
+    console.warn('You can manually install browsers later with:');
+    console.warn('  npx puppeteer browsers install chrome');
+    console.warn('  npx playwright install chromium');
+    process.exit(0); // Don't fail npm install
   }
 }
 
-main();
+main().catch((err) => {
+  console.error('Unexpected error:', err);
+  process.exit(0); // Still don't fail npm install
+});

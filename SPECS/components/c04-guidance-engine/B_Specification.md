@@ -1,67 +1,83 @@
 ---
-name: c04-spec
-description: Implementation specification for C04 Guidance Engine
+name: c04-guidance-engine-impl
+description: C04 Guidance Engine — Implementation specification
 ---
 
-# C04 Guidance Engine — Implementation Specification
+# C04 — Guidance Engine: Implementation Specification
 
 ---
 
-## 1. Interfaces
+## Interfaces
 
 ```typescript
-export async function buildGuidance(
-  studentSlug: string,
-  uniSlug: string,
-  timestamp: string,
-): Promise<{ reportPath: string; timestamp: string }>
-
-export async function showGuidance(
-  studentSlug: string,
-  uniSlug: string,
-  timestamp: string,
-): Promise<{ markdownPath: string }>
-
-export async function listGuidance(studentSlug: string, uniSlug: string): Promise<string[]>
+export function buildGuidance(studentSlug: string, uniSlug: string, timestamp: string): 
+  Promise<{ reportPath: string; timestamp: string }>;
+export function showGuidance(studentSlug: string, uniSlug: string, timestamp: string): 
+  Promise<{ markdownPath: string }>;
+export function listGuidance(studentSlug: string, uniSlug: string): Promise<string[]>;
 ```
 
 ---
 
-## 2. Operational Requirements
-
-### 2.1 UX Patterns
-
-- **Trigger:** User selects "Generate Guidance" from menu
-- **Progress:** Status bar shows "Generating guidance... please wait" during Gemini call
-- **Output:** Display markdown report; offer to export to PDF
-
-### 2.2 API Call Details
-
-- **Model:** From env GEMINI_MODEL
-- **Temperature:** 0.7 (slightly creative, but grounded)
-- **Prompt:** c04-guidance-generate.prompt.md with substitutions
-- **Timeout:** 30s; retry 1× after 30s wait on failure
-
-### 2.3 File Paths
+## Guidance Generation Prompt
 
 ```
-workspace/students/{slug}/universities/{uni_slug}/
-  └─ guidance/
-      └─ {timestamp}/
-          ├─ guidance.md
-          └─ guidance.pdf (created on demand by C06)
+You are a college admissions advisor. Given a student's profile and a target university's 
+institutional profile, generate personalized guidance.
+
+Student Profile:
+{STUDENT_PROFILE}
+
+University Profile:
+{UNIVERSITY_PROFILE}
+
+Guidance should include:
+1. How the student's academic strengths align with the university's academic environment
+2. How the student's extracurriculars and achievements match the university's ideal student profile
+3. Specific areas of the student's profile to highlight in applications
+4. Potential weaknesses or concerns to address proactively
+5. 2–3 specific examples from the student's profile that resonate with this university
+
+Format as readable markdown. Be constructive and encouraging.
 ```
 
 ---
 
-## 3. Testing
+## File Paths
 
-**Critical path:** Load profiles → Gemini call → write markdown → success
+```
+university-ao/students/<slug>/universities/<uni_slug>/guidance/
+  └─ <iso-timestamp>/
+     └─ guidance.md
+```
 
 ---
 
-## 4. Changes & Revisions
+## Error Handling
 
-| Date | Description |
-|:---|:---|
-| 2026-05-31 | Initial spec |
+| Error | Recovery |
+| :----- | :------- |
+| Student profile missing | "Build student profile first" |
+| University profile missing | "Build university profile first" |
+| Gemini timeout | "Request timed out. Retry? (y/n)" |
+| Empty response | "Guidance generation failed. Retry?" |
+
+---
+
+## Operational Requirements
+
+- **Response time:** < 1 minute from prompt to display (Gemini SLA + overhead)
+- **Retry logic:** Up to 1 retry after 30s delay on timeout
+- **Atomicity:** Only write guidance.md after successful generation
+
+---
+
+## Testing Requirements
+
+**Coverage:** 80% line coverage.
+
+**Critical paths:**
+- [ ] Build guidance with valid profiles → file created, content readable
+- [ ] Retry on timeout → success after 30s wait
+- [ ] Missing student profile → error message, no file created
+- [ ] List guidance → shows all timestamps in order

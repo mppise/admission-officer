@@ -1,6 +1,6 @@
 {
   "name": "university-admission-officer",
-  "version": "2.0.6",
+  "version": "2.0.7",
   "description": "Admissions Officer CLI — personalised college admissions guidance for high school students",
   "type": "module",
   "bin": {
@@ -12,8 +12,11 @@
     "start": "node dist/components/c01-cli-shell/index.js",
     "typecheck": "tsc --noEmit",
     "lint": "eslint src/**/*.ts src/**/*.tsx",
-    "deploy": "node scripts/deploy.js",
-    "postinstall": "node scripts/install-browsers.js"
+    "postinstall": "node scripts/install-browsers.js",
+    "publish:patch": "node scripts/publish-npm.js --patch",
+    "publish:minor": "node scripts/publish-npm.js --minor",
+    "publish:major": "node scripts/publish-npm.js --major",
+    "publish:dry-run": "node scripts/publish-npm.js --dry-run"
   },
   "files": [
     "dist/",

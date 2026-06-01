@@ -1,131 +1,115 @@
 ---
-name: c03-spec
-description: Implementation specification for C03 University Profile
+name: c03-university-profile-impl
+description: C03 University Profile Builder — Implementation specification
 ---
 
-# C03 University Profile — Implementation Specification
+# C03 — University Profile Builder: Implementation Specification
 
 ---
 
-## 1. Interfaces
+## Interfaces
 
 ```typescript
-export async function buildUniversityProfile(
+export function buildUniversityProfile(
   studentSlug: string,
-  universityName: string,
-  universityUrl: string,
-): Promise<{ profilePath: string; stats: RunStats }>
-
-export async function showUniversityProfile(studentSlug: string, uniSlug: string): Promise<{ markdown: string }>
-
-export async function deleteUniversityProfile(studentSlug: string, uniSlug: string): Promise<void>
-
-export async function listUniversities(studentSlug: string): Promise<Array<{ name: string; slug: string }>>
-
-interface RunStats {
-  urlsScanned: number
-  urlsFailed: number
-  urlsSkipped: number
-  llmCalls: number
-  totalInputTokens: number
-  totalOutputTokens: number
-}
+  uniName: string,
+  intendedMajors: string[],
+): Promise<{ uniSlug: string; profilePath: string }>;
+export function viewUniversityProfile(studentSlug: string, uniSlug: string): Promise<{ mdPath: string }>;
+export function deleteUniversityProfile(studentSlug: string, uniSlug: string): Promise<void>;
+export function listUniversityProfiles(studentSlug: string): Promise<{ uniSlug: string; universityName: string }[]>;
 ```
 
 ---
 
-## 2. Error Handling
+## File Paths
 
-| Scenario | Error Message | Recovery |
-|:---|:---|:---|
-| Invalid university URL | "Invalid URL. Please enter a valid domain (e.g., mit.edu)." | Prompt user to correct |
-| Network timeout | "Page fetch timed out. Skipping [url]. Continuing..." | Skip page, accumulate failure stat, continue |
-| Gemini API rate limit | "Rate limited. Waiting 60 seconds..." | Auto-wait, then retry |
-| Gemini token limit exceeded (batch) | "Batch too large. Truncating pages and retrying..." | Truncate to TRUNCATE_CHARS, resend |
-| Student profile not found | "Student [slug] not found. Build student profile first." | Return to menu |
-| Disk full (writing JSON) | "Could not save profile: [error]" | Suggest freeing disk space, allow retry |
-
-**Retry strategy:**
-- Network failures: retry 1× after 30s
-- Gemini rate limits: wait 60s + retry
-- Gemini token overflow: truncate + resend (no additional retry)
-
----
-
-## 3. Operational Requirements
-
-### 3.1 UX Patterns
-
-- **Input:** University name + URL (e.g., "Massachusetts Institute of Technology", "mit.edu")
-- **Cost estimation:** Show before scraping; allow user to confirm or cancel
-- **Progress display:** Real-time status bar (pages, LLM calls, tokens)
-- **Completion:** Summary stats (pages scraped, cost, tokens)
-
-### 3.2 Data Validation
-
-- **University name:** Non-empty, max 200 chars
-- **URL:** Valid domain format (validated via URL constructor)
-- **Intended majors:** Read from student profile; use to prioritize pages
-
-### 3.3 Scraping Configuration
-
-- **Max crawl pages:** 100 (MAX_CRAWL_PAGES constant)
-- **Timeout per page:** 30 seconds
-- **User-agent:** Identify as "Mozilla/5.0 (AO University Scanner)" to avoid blocks
-- **Respect robots.txt:** Check robots.txt before scraping; skip disallowed paths
-- **Rate limiting:** 1-2 second delay between requests to avoid IP bans
-
-### 3.4 Batch Extraction
-
-- **Prompt file:** c03-university-extract.prompt.md
-- **Categories:** Identity & Mission, Academic Environment, Admissions & Selection, Student Experience, Ideal Student Profile, Program: {major}
-- **Batch size logic:** Group pages until character budget exhausted, then create new batch
-
-### 3.5 Token Budgeting
-
-**Calculation:**
 ```
-charBudget = tokenWindow × (contentBudgetPct / 100) × 4
-             = 1048576 × 0.60 × 4
-             ≈ 2,516,582 chars
+university-ao/students/<student_slug>/universities/
+  └─ <uni_slug>/
+     └─ profile.json         # Structured data
+     └─ profile.md           # Human-readable
 ```
 
-**Per batch:**
-- Accumulate page texts until next page would exceed charBudget
-- Emit batch with accumulated texts
-- Proceed to next batch
+---
 
-**Fallback:** If single page > charBudget, truncate to TRUNCATE_CHARS (4000) and send alone
+## Scraping Strategy
 
-### 3.6 Security
+### Page Crawl
 
-- **User-agent:** Identify as bot (transparency)
-- **Rate limiting:** Respect server load; don't hammer with requests
-- **No PII logging:** Don't log university names/URLs to files
+1. User provides university URL (e.g., https://example.edu/)
+2. Playwright crawl starts from URL
+3. Extract text from each page (using DOM → plain text extraction)
+4. Follow links within same domain; max 100 pages
+5. Stop conditions: Max pages, timeout (5 min total), no new links
 
-### 3.7 Scalability
+### Tokenization & Batching
 
-- **Per university:** Max 100 pages, ~5–10 LLM calls (batched by category)
-- **All universities:** Bounded by disk + API quota
-- **Workspace limit:** ~100MB per 20 universities (acceptable)
+- Estimate tokens: `pageText.length / 4` (conservative, assumes ~4 chars per token)
+- Available token budget: `GEMINI_TOKEN_WINDOW * (GEMINI_CONTENT_BUDGET_PCT / 100)`
+- Batch pages until total estimated tokens would exceed budget
+- If single page > budget, truncate to last 4000 chars
+
+### AI Extraction Prompt
+
+Send batch to Gemini:
+
+```
+You are extracting key institutional facts from university website text.
+Categorize facts into:
+- Identity & Mission (mission statement, values, core principles)
+- Academic Environment (strengths, research focus, class sizes)
+- Admissions & Selection (what admissions office emphasizes)
+- Student Experience (campus culture, student life, traditions)
+- Ideal Student Profile (traits universities seek)
+- Program: [each major] (major-specific opportunities, resources)
+
+For each category, provide 1–3 concise bullet points. Be factual; infer from text, don't hallucinate.
+```
 
 ---
 
-## 4. Testing Requirements
+## Error Handling
 
-**Coverage threshold:** ≥80% line coverage
-
-### Critical Paths
-
-1. **Scraping:** Valid URL → fetch pages → success → save JSON
-2. **Extraction:** Batch AI calls → token budgeting → cost estimation → output
-3. **Error handling:** Network failure → skip page → continue
-4. **Major-scoped:** Student majors → prioritize pages → scrape program pages
+| Error | Recovery |
+| :----- | :------- |
+| Invalid URL | Show error, re-prompt |
+| Connection timeout | Retry current page (max 2x), skip if fails, continue with next |
+| Gemini token limit | Truncate batch to last 4000 chars, retry |
+| Gemini rate limit | Wait 30s, retry |
+| All pages failed | Show error, offer abort or retry |
 
 ---
 
-## 5. Changes & Revisions
+## Operational Requirements
 
-| Date | Description |
-|:---|:---|
-| 2026-05-31 | Initial spec |
+### UX
+
+- **Progress display:** Show "Page N/M crawled, extracting..." on C08 status bar
+- **Cost transparency:** Display estimated cost before starting → "Processing will cost ~$0.47. Continue? (y/n)"
+- **Cancellable:** User can Escape to abort crawl in progress
+
+### Data
+
+- **Atomicity:** Write profile only after all extractions complete; don't write partial profiles
+- **Slug:** Generated from university name (e.g., "Stanford University" → "stanford-university")
+- **Timestamps:** ISO 8601 for generated/last-updated
+
+### Security
+
+- **No secrets in logs:** API key never logged
+- **Domain whitelisting:** Only scrape pages within same domain as initial URL
+
+---
+
+## Testing Requirements
+
+**Coverage:** 80% line coverage.
+
+**Critical paths:**
+- [ ] Crawl small site (5 pages) → complete successfully
+- [ ] Crawl large site (>100 pages) → stop at 100, show count
+- [ ] Timeout → show partial results, allow retry
+- [ ] Gemini extraction → valid JSON, all required fields present
+- [ ] Cost estimation → matches actual token count (within ±10%)
+- [ ] File persistence → profile loads correctly after reload

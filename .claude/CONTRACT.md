@@ -156,21 +156,26 @@ If any rule about to be violated, Claude MUST:
 
 ## Automation Notes
 
-**What the harness enforces:**
-- Code changes to `src/` require Development phase (PreToolUse hook on Edit/Write)
+**What the harness enforces (PreToolUse hooks on src/ writes):**
 
-**How it works:**
-1. Hook reads `STATUS.md` Development phase status
-2. Checks if Development is "🔄 In Progress" or "✅ Complete"
-3. Blocks Edit/Write if inactive (exit code 2 + violation message)
-4. Hardstop—harness prevents execution, not conversation
+| Hook | Trigger | Check | Block condition |
+|------|---------|-------|-----------------|
+| `compact_gate` | Edit/Write to `src/*` | Phase-transition compact marker + Development status | Marker exists AND Development not yet active → must run `/compact` first |
+| `code_change` | Edit/Write to `src/*` | Development phase status in STATUS.md | Development not "🔄 In Progress" or "✅ Complete" → blocked |
+| `validate-src-structure` | Write to `src/**` | Inline prompts in `src/ai/*.ts`; edits to existing `src/db/migrations/*.sql` | Violation → blocked with message |
+
+**How phase gate hooks work:**
+1. Hook reads STATUS.md Development phase status via `get_dev_status()`
+2. `compact_gate` runs first — blocks if compact marker present and Development is not yet active
+3. `code_change` runs second — blocks if Development phase is not In Progress or Complete
+4. Both are hardstops — harness prevents execution, not conversation
 
 **What remains conversational:**
 - Rule 1 (Privacy): No technical gate
 - Rule 2 (No Unauthorized Calls): No blocking hook
 - Rule 3 (Ground Truth): Hook depends on it; rule still required
-- Rule 4.1 (Phase Order): Skill gates enforce entry; no general reorder prevention
-- Rule 4.3 (Gate Conditions): Skill gates verify; rule defines them
+- Rule 4.1 (Phase Order): Skill startup checklists enforce entry
+- Rule 4.3 (Gate Conditions): Skill gate steps verify; rule defines them
 - Rule 5 (No Autonomous Plan Mode): No technical gate
 
 ---

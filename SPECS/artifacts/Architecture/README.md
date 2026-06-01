@@ -32,6 +32,7 @@ Architecture decisions are **cross-cutting constraints** that every component mu
 | **[6_Resilience.md](./6_Resilience.md)** | Backend, SRE | Error handling patterns, failure classification, retry strategies |
 | **[7_Observability.md](./7_Observability.md)** | SRE, Engineers | Logging, tracing, analytics, SLO targets |
 | **[8_Scalability.md](./8_Scalability.md)** | Backend, SRE, Architecture | Load profile, scaling model, bottleneck mitigation |
+| **[9_Directory_Structure.md](./9_Directory_Structure.md)** | All Engineers | Source code tree layout, file organization, component ownership, enforcement rules |
 
 ---
 
@@ -44,13 +45,13 @@ Architecture decisions are **cross-cutting constraints** that every component mu
 
 **Backend Engineer:**
 - Start with [0_Overview.md](./0_Overview.md) (System Blueprint)
-- Read [1_Stack.md](./1_Stack.md) (Tech Stack)
+- Read [1_Stack.md](./1_Stack.md) (Tech Stack) and [9_Directory_Structure.md](./9_Directory_Structure.md) (file organization)
 - Deep dive: [3_Data.md](./3_Data.md), [4_API.md](./4_API.md), [6_Resilience.md](./6_Resilience.md)
 - Reference [7_Observability.md](./7_Observability.md) for logging/tracing requirements
 
 **Frontend Engineer:**
 - Start with [0_Overview.md](./0_Overview.md) (System Blueprint)
-- Read [2_UX.md](./2_UX.md) for interface surfaces and flows
+- Read [2_UX.md](./2_UX.md) for interface surfaces and flows and [9_Directory_Structure.md](./9_Directory_Structure.md) (file organization)
 - Reference [4_API.md](./4_API.md) for backend contracts
 - Check [7_Observability.md](./7_Observability.md) for analytics events
 
@@ -98,13 +99,13 @@ If development reveals a need for a bounded amendment:
 
 | Date | Change | File(s) | Rationale |
 |------|--------|---------|-----------|
-| | | | |
+| 2026-05-31 | Add directory structure specification | 9_Directory_Structure.md | Enforce consistent file organization (src/ai for prompts, src/db for migrations, etc.) across development |
 
 ---
 
 ## Related Documentation
 
 - **Project Definition:** `./SPECS/artifacts/Project.md`
-- **Development Standards:** `./SPECS/artifacts/B_Development_Standards.md`
+- **Development Standards:** `./CLAUDE.md` (Definition of Done, Testing Requirements, Inline Code Documentation)
 - **Decisions:** `./SPECS/artifacts/Decisions.md`
 - **Component Specs:** `./SPECS/components/`

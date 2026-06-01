@@ -1,61 +1,62 @@
 ---
-name: c04-core-spec
-description: Core spec for C04 Guidance Engine
+name: c04-guidance-engine-core
+description: C04 Guidance Engine — Feature specification
 ---
 
-# C04 Guidance Engine — Core Specification
+Architecture refs: 0_Overview.md, 2_UX.md
 
-**Component:** Guidance Engine  
-**Purpose:** Generate personalized fit analysis matching student profile to university profile  
-**Status:** Ready (implementation in progress)
+# C04 — Guidance Engine: Core Specification
 
 ---
 
 ## Features
 
 | Feature ID | Description | Status | Req Ref |
-|:---|:---|:---|:---|
-| C04-F01 | Generate guidance report: student strengths → university fit analysis | Ready | REQ-0008 |
-| C04-F02 | View guidance report (display markdown) | Ready | REQ-0008 |
-| C04-F03 | List guidance reports by timestamp | Ready | REQ-0008 |
+| :--------- | :---------- | :----- | :------ |
+| C04-F01 | Load student + university profiles | Ready | REQ-0005 |
+| C04-F02 | Analyze student fit to university | Ready | REQ-0005 |
+| C04-F03 | Generate personalized guidance via Gemini | Ready | REQ-0005 |
+| C04-F04 | Display guidance in markdown format | Ready | REQ-0005 |
+| C04-F05 | Persist guidance (timestamped snapshots) | Ready | REQ-0010 |
 
 ---
 
 ## Acceptance Criteria
 
-### C04-F01: Generate Guidance
-- [ ] Requires student profile.md and university profile.md to exist
-- [ ] Calls Gemini with c04-guidance-generate.prompt.md
-- [ ] Substitutes {{STUDENT_PROFILE}} and {{UNIVERSITY_PROFILE}} into prompt
-- [ ] Output: markdown report with sections: Overview, Strengths, Opportunities, Key Messages for Essay
-- [ ] Persisted to workspace/students/{slug}/universities/{uni_slug}/guidance/{timestamp}/guidance.md
-- [ ] Timestamp: YYYY-MM-DD-HHMM format
-- [ ] Retry: 1 automatic retry after 30s if Gemini fails
+### C04-F01: Load Profiles
 
-### C04-F02: View Guidance
-- [ ] Display markdown to stdout
-- [ ] User can copy/paste or export to PDF (via C06)
+- [ ] Verify student profile exists
+- [ ] Verify university profile exists
+- [ ] Load both as markdown (human-readable for AI)
+- [ ] Show error if either missing
 
-### C04-F03: List Guidance
-- [ ] List all timestamps in reverse chronological order
-- [ ] User can select timestamp to view
+### C04-F02: Fit Analysis
+
+- [ ] Extract key strengths from student profile (GPA, test scores, top activities)
+- [ ] Extract university priorities from university profile (ideal traits, academic focus)
+- [ ] Identify overlaps and gaps
+
+### C04-F03: Guidance Generation
+
+- [ ] Send prompt to Gemini: "Student [name] with [profile summary] is applying to [university name] which seeks [university priorities]. Generate personalized college guidance covering: (1) how student's strengths align with university values; (2) areas to highlight in essays; (3) potential concerns and how to address them."
+- [ ] Gemini response is 3–5 paragraphs of readable markdown
+- [ ] Include actionable advice (e.g., "Emphasize your leadership in Math Club, which matches Stanford's collaborative research environment")
+
+### C04-F04: Display Guidance
+
+- [ ] Show generated markdown to user (paginated if > 80 cols)
+- [ ] Offer: Save, Edit, Discard, Share (PDF export)
+
+### C04-F05: Persistence
+
+- [ ] Save to `university-ao/students/<slug>/universities/<uni-slug>/guidance/<timestamp>/guidance.md`
+- [ ] Timestamp format: ISO 8601
+- [ ] User can view all guidance versions per university (list by timestamp)
 
 ---
 
 ## Error Handling
 
-| Scenario | Error Message | Recovery |
-|:---|:---|:---|
-| Student profile missing | "No student profile found. Build a student profile first." | Return to menu |
-| University profile missing | "No university profile found. Build a university profile first." | Return to menu |
-| Gemini API fails | "Guidance generation failed. Retrying in 30 seconds..." | Auto-retry 1×, then error |
-| Empty Gemini response | "Gemini returned empty response. Try again." | User can retry |
-| File write fails | "Could not save guidance: [error]" | User can retry or skip |
-
----
-
-## Design Notes
-
-- **Prompt file:** c04-guidance-generate.prompt.md with {{STUDENT_PROFILE}}, {{UNIVERSITY_PROFILE}} placeholders
-- **Output:** Markdown formatted for human reading + PDF export (via C06)
-- **Tone:** Constructive, emphasizing student's strengths; actionable for essay writing
+- [ ] Missing profile → show clear error, don't attempt guidance
+- [ ] Gemini timeout → offer retry (with 30s delay)
+- [ ] Empty response from Gemini → show error, offer retry

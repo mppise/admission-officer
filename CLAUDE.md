@@ -49,6 +49,7 @@ Each skill stage creates artifacts. Each artifact must follow CLAUDE.md standard
 ### `./SPECS/components/<component>/A_Core_Spec.md` (WHAT — Behavioral Specification)
 - **Skill** (operational): "Create features table with behavior, acceptance criteria, and scope"
 - **CLAUDE.md** (structural): Apply these standards:
+  - **Header line:** `Architecture refs: <file1>, <file2>` listing only the Architecture/ files relevant to this component (e.g., `Architecture refs: 1_Stack.md, 3_Data.md`). During Development, only these files are loaded for this component. Default if absent: `0_Overview.md, 1_Stack.md`.
   - Features table with columns: [Feature ID | Description | Status | Req Ref]
   - Feature Status Values: every feature has status from [Not Started, In Design, Ready, In Progress, Complete, Blocked, Revised]
   - Requirement Traceability: every feature has Req Ref column linking to one or more REQ-NNNN from Project.md §3.1
@@ -120,7 +121,7 @@ STATUS.md (Complete status; release ready)
 Every link in this chain is bidirectional and auditable. No feature exists in code without a spec entry. No spec entry exists without a requirement. This is enforced by:
 - **Skill stage instructions** (operational enforcement: "verify every feature maps back")
 - **CLAUDE.md standards** (structural enforcement: "Definition of Done requires Feature ID in code")
-- **CONTRACT.md Rule 4.4** (binding enforcement: "code change without spec = STOP")
+- **Harness hooks** (automated enforcement: `src/` writes blocked without active Development phase)
 
 ---
 
@@ -241,7 +242,7 @@ All assumptions, decisions, risks use same format:
 **Rules:**
 - IDs permanent. Never renumber or reuse.
 - Removed/deferred items: mark status in DECISIONS.md, don't delete.
-- Every ID in code/specs/architecture must point to valid DECISIONS.md or DECISIONS_ARCHIVE.md row.
+- Every ID in code/specs/architecture must point to valid DECISIONS.md or _Decisions.md row.
 
 ---
 
@@ -258,15 +259,15 @@ The `/design` skill maintains Decisions.md conversationally:
 
 ---
 
-# Phase Gating (CONTRACT.md Rules 4.1–4.4)
+# Phase Gating (CONTRACT.md Rules 4.1–4.3)
 
-**SpecGantry enforces strict phase gating.** See CONTRACT.md Rules 4.1–4.4 (binding). Skill startup checklists in `ideate/SKILL.md`, `design/SKILL.md`, `develop/SKILL.md` verify gates before proceeding.
+**SpecGantry enforces strict phase gating.** See CONTRACT.md Rules 4.1–4.3 (binding). Skill startup checklists in `ideate/SKILL.md`, `design/SKILL.md`, `develop/SKILL.md` verify gates before proceeding.
 
 **Key enforcement:**
 - **Rule 4.1:** Ideation → Design → Development (cannot skip/reorder)
 - **Rule 4.2:** Entry rules by work type (new idea = Ideation, bug fix = Design, hotfix = Development fast-track)
 - **Rule 4.3:** Gate conditions (what must be true to exit each phase)
-- **Rule 4.4:** Code Change Safeguard (if code requested without spec → STOP, declare, ask permission)
+- **Harness hooks:** Code changes to `src/` blocked by PreToolUse hook if Development phase not active (see CONTRACT.md § Automation Notes)
 
 **Skill startup checks:**
 - `/ideate`: Verify Ideation is active or new project

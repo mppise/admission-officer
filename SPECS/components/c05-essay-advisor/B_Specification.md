@@ -1,84 +1,110 @@
 ---
-name: c05-spec
-description: Implementation specification for C05 Essay Advisor
+name: c05-essay-advisor-impl
+description: C05 Essay Advisor — Implementation specification
 ---
 
-# C05 Essay Advisor — Implementation Specification
+# C05 — Essay Advisor: Implementation Specification
 
 ---
 
-## 1. Interfaces
+## Interfaces
 
 ```typescript
-export async function buildEssay(
-  studentSlug: string,
-  uniSlug: string,
-  timestamp: string,
-): Promise<{ essayPath: string; timestamp: string }>
+export function buildEssay(studentSlug: string, uniSlug: string, timestamp: string): 
+  Promise<{ essayPath: string; timestamp: string }>;
+export function showEssay(studentSlug: string, uniSlug: string, hash: string): 
+  Promise<{ mdPath: string }>;
+export function listEssays(studentSlug: string, uniSlug: string): Promise<string[]>;
+```
 
-export async function showEssay(studentSlug: string, uniSlug: string, timestamp: string, essayFile: string): Promise<{ markdown: string }>
+---
 
-export async function listEssays(studentSlug: string, uniSlug: string): Promise<Array<{ timestamp: string; typeSlug: string; hash: string }>>
+## Essay Type Mapping
 
-// Constants
-export const ESSAY_TYPE_SLUGS: Record<string, string> = {
-  "Personal Statement": "personal-statement",
+```typescript
+const ESSAY_TYPE_SLUGS: Record<string, string> = {
+  "Personal Statement": "personal",
+  "Why Us?": "why-us",
+  "Why [Major]?": "why-major",
   "Supplemental Essay": "supplemental",
-  "Why Us Essay": "why-us",
-  "Topic of Your Choice": "topic-choice",
-  // ... more types
-}
+  "CommonApp Prompt 1": "common-1",
+  "CommonApp Prompt 2": "common-2",
+  "CommonApp Prompt 3": "common-3",
+  "CommonApp Prompt 4": "common-4",
+  "CommonApp Prompt 5": "common-5",
+  "CommonApp Prompt 6": "common-6",
+  "CommonApp Prompt 7": "common-7",
+};
 ```
 
 ---
 
-## 2. Operational Requirements
-
-### 2.1 UX Patterns
-
-- **Flow:** Select essay type → paste prompt → enter word limit → Gemini generates → display markdown
-- **Overwrite check:** If essay exists for type+hash in directory, ask before regenerating
-- **Progress:** Status bar shows "Generating essay outline..." during Gemini call
-- **Output:** Display markdown, offer PDF export
-
-### 2.2 File Naming
+## Essay Generation Prompt
 
 ```
-workspace/students/{slug}/universities/{uni_slug}/essays/
-  └─ {timestamp}/
-      └─ {typeSlug}-{hash}.md
-```
+You are a college essay writing coach. Generate an outline and inspiration samples.
 
-**Example:** `personal-statement-a3f2e1c9.md` (type slug + 8-char hash)
+Essay Type: {ESSAY_TYPE}
+Prompt: {ESSAY_PROMPT}
+Word Limit: {WORD_LIMIT}
 
-### 2.3 Gemini Call
+Student Background:
+{STUDENT_PROFILE}
 
-- **Temperature:** 0.8 (creative)
-- **Model:** From env GEMINI_MODEL
-- **Timeout:** 30s, retry 1× on failure
-- **Prompt:** c05-essay-generate.prompt.md
+Target University:
+{UNIVERSITY_PROFILE}
 
-### 2.4 Disclaimer
+Generate a detailed essay outline with:
+1. Hook ideas (3–5 different opening approaches)
+2. Main body structure (3–4 paragraph themes)
+3. Conclusion strategy
+4. 2–3 inspiration samples (brief, labeled as "INSPIRATION SAMPLE #1" etc.) showing tone/structure
 
-Always prepended to output (before any AI-generated content):
-
-```markdown
-> ⚠️ IMPORTANT: The inspiration samples below are provided to help you understand
-> how to draw on your own experiences. Do NOT submit them as your own work.
-> Use them only as a reference for tone, structure, and how to connect your
-> profile to the prompt. Your essay must be written in your own voice.
+Inspiration samples should demonstrate how to weave personal experience with the prompt, 
+but must not be submitted as-is.
 ```
 
 ---
 
-## 3. Testing
+## File Paths
 
-**Critical path:** Input collection → deduplication check → Gemini call → markdown with disclaimer → file save
+```
+university-ao/students/<slug>/universities/<uni_slug>/essays/
+  └─ <iso-timestamp>/
+     └─ <type>-<hash>.md
+```
+
+Hash calculation: DJB2 hash of `prompt.trim()` (ensures same prompt → same file).
 
 ---
 
-## 4. Changes & Revisions
+## Error Handling
 
-| Date | Description |
-|:---|:---|
-| 2026-05-31 | Initial spec |
+| Error | Recovery |
+| :----- | :------- |
+| Missing profiles | "Build student & university profiles first" |
+| Empty prompt | Validation error, re-prompt |
+| Gemini timeout | "Request timed out. Retry? (y/n)" |
+| Empty response | "Essay generation failed. Retry?" |
+| Duplicate essay | Ask user: "Essay outline exists for this prompt. Overwrite? (y/n)" |
+
+---
+
+## Operational Requirements
+
+- **Response time:** < 1 minute (Gemini SLA + overhead)
+- **Disclaimer:** Always present in output
+- **Atomicity:** Only write file after successful generation
+
+---
+
+## Testing Requirements
+
+**Coverage:** 80% line coverage.
+
+**Critical paths:**
+- [ ] Generate essay outline → file created, readable markdown
+- [ ] Duplicate prompt detection → ask overwrite confirmation
+- [ ] List essays → shows all types and hashes
+- [ ] Disclaimer present → always appears at top
+- [ ] Timeout retry → success after 30s delay

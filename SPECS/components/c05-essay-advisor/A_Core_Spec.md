@@ -1,71 +1,63 @@
 ---
-name: c05-core-spec
-description: Core spec for C05 Essay Advisor
+name: c05-essay-advisor-core
+description: C05 Essay Advisor — Feature specification
 ---
 
-# C05 Essay Advisor — Core Specification
+Architecture refs: 0_Overview.md, 2_UX.md
 
-**Component:** Essay Advisor  
-**Purpose:** Collect essay details and generate outline/inspiration based on student + university profiles  
-**Status:** Ready (implementation in progress)
+# C05 — Essay Advisor: Core Specification
 
 ---
 
 ## Features
 
 | Feature ID | Description | Status | Req Ref |
-|:---|:---|:---|:---|
-| C05-F01 | Prompt user for essay type (personal, supplemental, etc.) via SpaciousSelect | Ready | REQ-0009 |
-| C05-F02 | Prompt user for essay prompt (max 1000 chars) via waitForText | Ready | REQ-0009 |
-| C05-F03 | Prompt user for word limit (optional) via waitForText | Ready | REQ-0009 |
-| C05-F04 | Generate essay outline/inspiration via Gemini + inject plagiarism disclaimer | Ready | REQ-0009, REQ-0010 |
-| C05-F05 | Deduplicate outlines via prompt hash (avoid re-generating same prompt) | Ready | REQ-0009 |
-| C05-F06 | View essay outline (display markdown) | Ready | REQ-0009 |
-| C05-F07 | List essays by timestamp | Ready | REQ-0009 |
+| :--------- | :---------- | :----- | :------ |
+| C05-F01 | Collect essay type, prompt, word limit | Ready | REQ-0006 |
+| C05-F02 | Validate essay type and prompt length | Ready | REQ-0006 |
+| C05-F03 | Generate essay outline with AI | Ready | REQ-0006 |
+| C05-F04 | Include disclaimer on AI inspiration samples | Ready | REQ-0006 |
+| C05-F05 | Persist essay outlines (timestamped) | Ready | REQ-0010 |
 
 ---
 
 ## Acceptance Criteria
 
-### C05-F01–F03: Input Collection
-- [ ] Menu: list essay types (Personal Statement, Supplemental, etc.)
-- [ ] Prompt: paste essay prompt (up to 1000 chars, trimmed)
-- [ ] Word limit: optional (default "Not specified")
-- [ ] Validation: non-empty prompt required
+### C05-F01: Essay Collection
 
-### C05-F04: Generation
-- [ ] Calls Gemini c05-essay-generate.prompt.md
-- [ ] Substitutes {{ESSAY_TYPE}}, {{ESSAY_PROMPT}}, {{WORD_LIMIT}}, {{STUDENT_PROFILE}}, {{UNIVERSITY_PROFILE}}
-- [ ] Output: markdown with essay structure, key points, sample opening
-- [ ] Prepends plagiarism disclaimer: "⚠️ IMPORTANT: These are inspiration samples..."
-- [ ] Persisted to workspace/students/{slug}/universities/{uni_slug}/essays/{timestamp}/{typeSlug}-{hash}.md
-- [ ] Retry: 1× after 30s on failure
+- [ ] Prompt for essay type (dropdown: Personal Statement, Why Us, Common App Prompt 1–7, Supplemental, etc.)
+- [ ] Prompt for full essay prompt text (up to 1000 chars)
+- [ ] Prompt for word limit (optional; user can skip)
+- [ ] Show summary before generation
 
-### C05-F05: Deduplication
-- [ ] Hash prompt with djb2Hash(prompt.trim())
-- [ ] If essay for same type + hash already exists in timestamp dir: ask overwrite?
-- [ ] On cancel: return existing essay without regenerating
+### C05-F02: Validation
 
-### C05-F06–F07: View/List
-- [ ] View: display markdown to stdout
-- [ ] List: show essays by timestamp, user can select to view
+- [ ] Essay type must be selected (not empty)
+- [ ] Prompt must be > 20 chars (not a stub)
+- [ ] Word limit (if provided) must be integer > 0
+- [ ] Show error + re-prompt on validation failure
+
+### C05-F03: Outline Generation
+
+- [ ] Load student + university profiles
+- [ ] Send to Gemini: "Generate an essay outline for [essay type] to this prompt: [prompt]. Student background: [profile]. Target university: [profile]. Provide: (1) hook/opening ideas; (2) main body structure (3–4 paragraphs); (3) conclusion; (4) 2–3 inspiration samples (labeled as INSPIRATION, not to be submitted)."
+- [ ] Response is readable markdown with clear sections
+
+### C05-F04: Disclaimer
+
+- [ ] If response lacks disclaimer, prepend: "⚠️ IMPORTANT: The inspiration samples below are provided to help you understand how to draw on your own experiences. Do NOT submit them as your own work. Use them only as a reference for tone, structure, and how to connect your profile to the prompt. Your essay must be written in your own voice."
+- [ ] Disclaimer appears at top of generated markdown
+
+### C05-F05: Persistence
+
+- [ ] Save to `university-ao/students/<slug>/universities/<uni_slug>/essays/<timestamp>/<type>-<hash>.md`
+- [ ] Hash is DJB2 hash of prompt text (stable, allows dedup)
+- [ ] User can list all essays per university, view each, export to PDF
 
 ---
 
 ## Error Handling
 
-| Scenario | Error Message | Recovery |
-|:---|:---|:---|
-| Student profile missing | "No student profile found..." | Return to menu |
-| University profile missing | "No university profile found..." | Return to menu |
-| Empty prompt | "Essay prompt cannot be empty." | Prompt user to enter |
-| Gemini fails | "Gemini returned empty response. Try again." | User can retry |
-
----
-
-## Design Notes
-
-- **Essay types:** Enum ESSAY_TYPE_SLUGS maps display name → slug (e.g., "Personal Statement" → "personal-statement")
-- **Prompt hash:** djb2 hash used for deduplication; collision risk minimal for high school essays
-- **Disclaimer:** Always included in output; user must copy text (emphasizes that it's not final essay)
-- **Temperature:** 0.8 (creative, helps generate varied essay ideas)
+- [ ] Missing profiles → show error, don't generate
+- [ ] Gemini timeout → offer retry
+- [ ] Empty prompt → validation error, re-prompt

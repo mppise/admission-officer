@@ -1,58 +1,56 @@
 ---
-name: c06-core-spec
-description: Core spec for C06 PDF Exporter
+name: c06-pdf-exporter-core
+description: C06 PDF Exporter — Feature specification
 ---
 
-# C06 PDF Exporter — Core Specification
+Architecture refs: 0_Overview.md, 1_Stack.md
 
-**Component:** PDF Exporter  
-**Purpose:** Convert markdown (guidance reports, essays) to styled PDF  
-**Status:** Ready (implementation in progress)
+# C06 — PDF Exporter: Core Specification
 
 ---
 
 ## Features
 
 | Feature ID | Description | Status | Req Ref |
-|:---|:---|:---|:---|
-| C06-F01 | Convert markdown to HTML with CSS styling (marked + inline CSS) | Ready | REQ-0011 |
-| C06-F02 | Render HTML to PDF via Puppeteer headless browser | Ready | REQ-0011 |
+| :--------- | :---------- | :----- | :------ |
+| C06-F01 | Convert markdown to HTML with inline CSS | Ready | REQ-0007 |
+| C06-F02 | Render HTML to PDF via Puppeteer | Ready | REQ-0007 |
+| C06-F03 | Export any artifact (profile, guidance, essay) to PDF | Ready | REQ-0007 |
 
 ---
 
 ## Acceptance Criteria
 
-### C06-F01: Markdown → HTML
-- [ ] Read markdown file from disk
-- [ ] Parse with marked library
-- [ ] Inject CSS (pdf.css) inline in HTML <style> tag
-- [ ] Generate valid HTML5 document
+### C06-F01: Markdown to HTML
 
-### C06-F02: HTML → PDF
-- [ ] Launch Puppeteer headless Chrome
-- [ ] Set page content to HTML
-- [ ] Render to PDF: A4 format, 20mm margins, print background enabled
-- [ ] Write to disk: same directory as markdown, .pdf extension
-- [ ] Close browser gracefully
+- [ ] Use `marked.parse()` to convert markdown → HTML
+- [ ] Inline CSS stylesheet (`pdf.css`) for formatting
+- [ ] Preserve markdown structure: headers, lists, tables, bold/italic
+- [ ] Output valid HTML5 with `<!DOCTYPE html>`
+- [ ] No external resources (all CSS inline)
+
+### C06-F02: HTML to PDF
+
+- [ ] Use Puppeteer (Chromium) to render HTML
+- [ ] Auto-launch Puppeteer headless browser
+- [ ] If browser not installed, run `npx puppeteer browsers install chrome` (post-install script)
+- [ ] Render as A4 page, portrait, with 20mm margins on all sides
+- [ ] PDF renders correctly (no truncation, readable fonts)
+- [ ] Output file created successfully
+
+### C06-F03: Export Any Artifact
+
+- [ ] User selects artifact from menu: Student profile, University profile, Guidance, Essay
+- [ ] User selects which instance (if multiple versions exist)
+- [ ] Component reads markdown from filesystem
+- [ ] Converts and saves PDF to `university-ao/students/<slug>/exports/<name>.pdf`
+- [ ] Shows confirmation: "PDF saved to <path>"
 
 ---
 
 ## Error Handling
 
-| Scenario | Error Message | Recovery |
-|:---|:---|:---|
-| Markdown file not found | "PDF export failed: source file not found..." | Return to menu |
-| CSS file missing | "PDF export failed: CSS stylesheet not found..." | Rebuild npm (CSS should be bundled) |
-| Browser launch fails | "PDF export failed: could not launch browser..." + recovery steps | Auto-install browsers, retry |
-| Browser timeout | "PDF export failed: rendering timed out" | User can retry |
-| Disk full | "PDF export failed: could not write to [path]..." | User checks disk space, retries |
-| Markdown parse error | "PDF export failed: could not parse markdown" | Likely markdown corruption; report as bug |
-
----
-
-## Design Notes
-
-- **CSS styling:** pdf.css defines typography, layout, colors (magenta/cyan theme)
-- **Browser management:** Try Puppeteer first; on failure, auto-install browsers + retry
-- **Timeout:** 5 seconds per PDF render (generous for small documents)
-- **PDF options:** A4, 20mm margins, printBackground: true (captures colored backgrounds)
+- [ ] Markdown file not found → show error, don't attempt conversion
+- [ ] Browser launch failed → attempt auto-install, retry, show error if still fails
+- [ ] Disk full on write → show error with disk space suggestion
+- [ ] Invalid markdown → fallback gracefully (show raw text)

@@ -41,9 +41,26 @@
                 "hooks": [
                     {
                         "type": "command",
+                        "command": "ENFORCE_CHECK=compact_gate bash .claude/hooks/enforce-phase-gates.sh",
+                        "statusMessage": "🔒 Enforcing: Phase transition compact check...",
+                        "if": "Edit(src/*) || Write(src/*)"
+                    },
+                    {
+                        "type": "command",
                         "command": "ENFORCE_CHECK=code_change bash .claude/hooks/enforce-phase-gates.sh",
                         "statusMessage": "🔒 Enforcing: Code changes require Development phase...",
                         "if": "Edit(src/*) || Write(src/*)"
+                    }
+                ]
+            },
+            {
+                "matcher": "Write",
+                "hooks": [
+                    {
+                        "type": "command",
+                        "command": "bash .claude/hooks/validate-src-structure.sh",
+                        "statusMessage": "🔒 Enforcing: Source directory structure rules...",
+                        "if": "Write(src/**)"
                     }
                 ]
             }

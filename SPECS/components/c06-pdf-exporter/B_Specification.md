@@ -1,100 +1,100 @@
 ---
-name: c06-spec
-description: Implementation specification for C06 PDF Exporter
+name: c06-pdf-exporter-impl
+description: C06 PDF Exporter — Implementation specification
 ---
 
-# C06 PDF Exporter — Implementation Specification
+# C06 — PDF Exporter: Implementation Specification
 
 ---
 
-## 1. Interfaces
+## Interfaces
 
 ```typescript
-export async function exportToPdf(markdownPath: string): Promise<{ pdfPath: string }>
+export async function exportToPdf(markdownPath: string, outputPath: string): Promise<void>;
 ```
 
 ---
 
-## 2. Implementation Details
-
-### 2.1 Markdown → HTML
-
-**Function:** markdownToHtml(markdownContent: string): Promise<string>
+## Markdown to HTML Conversion
 
 ```typescript
-1. Read CSS from dist/components/c06-pdf-exporter/styles/pdf.css
-2. Parse markdown with marked.parse(markdownContent)
-3. Inject CSS into <style> tag
-4. Wrap in HTML5 boilerplate
-5. Return full HTML document string
+// Use marked.parse() to convert markdown
+// Inline CSS from ./styles/pdf.css
+const html = `<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <style>
+${cssContent}
+  </style>
+</head>
+<body>
+  <div class="ao-document">
+${htmlBody}
+  </div>
+</body>
+</html>`;
 ```
 
-### 2.2 HTML → PDF
+---
 
-**Function:** renderPdf(htmlContent: string, pdfPath: string): Promise<void>
+## HTML to PDF Rendering
 
 ```typescript
-1. Try: puppeteer.launch({ headless: true })
-2. On error: ensureBrowsersInstalled() → retry launch
-3. Open new page
-4. setContent(htmlContent, { waitUntil: 'networkidle0' })
-5. page.pdf({ path: pdfPath, format: 'A4', margin: {20mm}, printBackground: true })
-6. Close browser
-```
-
-### 2.3 Error Handling
-
-**markdownToHtml errors:**
-- CSS file missing: wrap in try/catch, throw with hint
-- Markdown parse fails: wrap marked.parse() in try/catch
-
-**renderPdf errors:**
-- Browser launch fails: ensureBrowsersInstalled() + retry logic
-- setContent fails: check HTML validity; throw with context
-- page.pdf() fails: likely disk/permissions; throw with path + hint
-
----
-
-## 3. File Locations
-
-```
-Source markdown: workspace/students/{slug}/universities/{uni_slug}/guidance/{timestamp}/guidance.md
-Output PDF:      workspace/students/{slug}/universities/{uni_slug}/guidance/{timestamp}/guidance.pdf
-
-Source markdown: workspace/students/{slug}/universities/{uni_slug}/essays/{timestamp}/{type}-{hash}.md
-Output PDF:      workspace/students/{slug}/universities/{uni_slug}/essays/{timestamp}/{type}-{hash}.pdf
+async function renderPdf(htmlContent: string, pdfPath: string): Promise<void> {
+  const browser = await puppeteer.launch({ headless: true });
+  const page = await browser.newPage();
+  await page.setContent(htmlContent, { waitUntil: 'networkidle0' });
+  await page.pdf({
+    path: pdfPath,
+    format: 'A4',
+    printBackground: true,
+    margin: { top: '20mm', bottom: '20mm', left: '20mm', right: '20mm' },
+  });
+  await browser.close();
+}
 ```
 
 ---
 
-## 4. CSS Styling (pdf.css)
+## File Paths
 
-**Requirements:**
-- Clear typography (readable on print)
-- Magenta/cyan brand colors (headers, links)
-- Proper margins and spacing
-- Page breaks handled gracefully
-- Heading hierarchy visible
-
-**Example structure:**
-```css
-body { font-family: serif; margin: 0; }
-.ao-document { padding: 0; }
-h1 { color: #ff00ff; /* magenta */ }
-h2 { color: #00ffff; /* cyan */ }
-p { line-height: 1.6; }
+```
+university-ao/students/<slug>/exports/
+  ├─ profile.pdf
+  ├─ university-<uni_slug>.pdf
+  ├─ guidance-<iso_timestamp>.pdf
+  └─ essay-<type>-<hash>.pdf
 ```
 
 ---
 
-## 5. Testing
+## Error Handling
 
-**Critical path:** Read markdown → parse → render PDF → write file → verify PDF exists
+| Error | Recovery |
+| :----- | :------- |
+| Markdown file not found | "File not found: {path}" |
+| Browser launch failed | Attempt `npx puppeteer browsers install chrome`, retry |
+| Disk full | "Disk full or write permission denied" |
+| Invalid markdown | Fallback: render as-is with minimal styling |
 
 ---
 
-## 6. Changes & Revisions
+## Operational Requirements
 
-| Date | Description |
-|:---|:---|
-| 2026-05-31 | Initial spec |
+- **Response time:** < 5 seconds per page (Puppeteer render + write)
+- **Browser management:** Ensure browser closes on success or error
+- **CSS styling:** Must be readable on printed page (black text, proper margins)
+
+---
+
+## Testing Requirements
+
+**Coverage:** 80% line coverage.
+
+**Critical paths:**
+- [ ] Convert markdown → HTML → valid HTML5
+- [ ] Render HTML → PDF → file created, readable
+- [ ] Handle long documents (5+ pages) → no truncation
+- [ ] Handle tables, code blocks → render correctly
+- [ ] Browser auto-install → success on first export after clean install
