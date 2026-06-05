@@ -1,0 +1,14 @@
+id: FEATURE-002
+title: "Student Profile Manager"
+domain: "core"
+assignee: null
+
+feature_spec_complete: true
+spec_reviewed: true
+dev_complete: true
+tests_passing: false
+deployment_status: "complete"
+
+notes: "Reverse-engineered from existing codebase (v4.0.0). Manages student profiles with academic stats, achievements, and goals. Largest component (1105 lines). No test coverage."
+
+token_usage: []

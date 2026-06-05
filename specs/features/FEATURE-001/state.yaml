@@ -1,0 +1,14 @@
+id: FEATURE-001
+title: "CLI Shell & Navigation"
+domain: "infrastructure"
+assignee: null
+
+feature_spec_complete: true
+spec_reviewed: true
+dev_complete: true
+tests_passing: false
+deployment_status: "complete"
+
+notes: "Reverse-engineered from existing codebase (v4.0.0). Main CLI entry point using Ink.js for menu navigation and command dispatch. No test coverage."
+
+token_usage: []

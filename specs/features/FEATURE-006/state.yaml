@@ -1,0 +1,14 @@
+id: FEATURE-006
+title: "PDF Report Exporter"
+domain: "export"
+assignee: null
+
+feature_spec_complete: true
+spec_reviewed: true
+dev_complete: true
+tests_passing: false
+deployment_status: "complete"
+
+notes: "Reverse-engineered from existing codebase (v4.0.0). Renders guidance and essays to PDF using Puppeteer (108 lines). No test coverage."
+
+token_usage: []

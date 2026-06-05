@@ -1,0 +1,14 @@
+id: FEATURE-004
+title: "AI Guidance Engine"
+domain: "ai"
+assignee: null
+
+feature_spec_complete: true
+spec_reviewed: true
+dev_complete: true
+tests_passing: false
+deployment_status: "complete"
+
+notes: "Reverse-engineered from existing codebase (v4.0.0). Generates personalized college-fit guidance via Google Generative AI. Compact implementation (87 lines). No test coverage."
+
+token_usage: []

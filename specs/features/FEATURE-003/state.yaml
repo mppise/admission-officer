@@ -1,0 +1,14 @@
+id: FEATURE-003
+title: "University Profile Extractor"
+domain: "core"
+assignee: null
+
+feature_spec_complete: true
+spec_reviewed: true
+dev_complete: true
+tests_passing: false
+deployment_status: "complete"
+
+notes: "Reverse-engineered from existing codebase (v4.0.0). Extracts university requirements and essay prompts via Playwright scraping (703 lines). No test coverage."
+
+token_usage: []

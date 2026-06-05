@@ -22,3 +22,6 @@ Thumbs.db
 
 # Playwright / Puppeteer browser downloads (auto-managed)
 .playwright/
+
+# SpecGantry local state (per-user, not shared)
+.claude/local-state.yaml
