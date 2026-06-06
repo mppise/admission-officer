@@ -1,0 +1,142 @@
+project_name: university-admission-officer
+release_label: v1.0
+reverse_engineered_from: existing codebase
+reverse_engineer_date: 2026-06-06
+author: Mangesh Pise
+
+phase_gates:
+  ideation_complete: true
+  architecture_complete: true
+  features_complete: true
+
+ideation_recommendation: proceed
+
+taxonomy:
+  domains:
+    - cli_shell
+    - student_profile
+    - university_profile
+    - guidance_engine
+    - essay_advisor
+    - pdf_exporter
+    - web_server
+    - status_bar
+
+architecture_summary: |
+  university-admission-officer is a Node.js/TypeScript CLI tool (and companion web server) that
+  guides high school students through personalised college admissions preparation. The CLI is
+  built on React/Ink for full-screen TUI and exposes an `ao` binary. All persistent data lives
+  under a local `university-ao/` workspace directory. AI integration uses the Google Gemini API
+  for profile enhancement, university scraping/synthesis, guidance report generation, and essay
+  outlining. A separate Express web server exposes the same scraping and generation pipeline via
+  REST endpoints backed by server-sent events.
+
+  Component layout (c0N prefix = component number):
+  - C01 CLI Shell     — navigation, screen routing, spinner, config management
+  - C02 Student Profile — structured TUI data-entry for academic/EC/award/research/shadowing data;
+                          Gemini enhancement on finalize; persists profile.json + profile.md
+  - C03 University Profile — 2-pass BFS crawl (Playwright/Chromium) + Gemini batch extraction +
+                              synthesis; persists profile.json (incremental) + profile.md
+  - C04 Guidance Engine — reads student + university profile.md; calls Gemini; writes guidance.md
+  - C05 Essay Advisor — collects essay type/prompt/word-limit via TUI; calls Gemini; writes essay .md
+  - C06 PDF Exporter  — Puppeteer markdown→HTML→PDF pipeline with Bootstrap CSS
+  - C07 (unimplemented slot)
+  - C08 Status Bar    — message queue + StatusFooter/MessageLogModal components, fully integrated
+                        into C01 AppScreen; postMessage() called by C02–C06 at all key stages
+  - Web Server        — Express server + SSE progress streaming; shares universityScraper utility
+
+  External dependencies: @google/generative-ai, ink, @inkjs/ui, playwright, puppeteer, marked,
+  express, dotenv, jspdf (unused in current release).
+
+backlog:
+  - id: FEATURE-001
+    title: CLI Shell & Navigation
+    domain: cli_shell
+    size: L
+    assignee: null
+    status: complete
+    deployment_status: complete
+    depends_on: []
+
+  - id: FEATURE-002
+    title: Student Profile Builder
+    domain: student_profile
+    size: L
+    assignee: null
+    status: complete
+    deployment_status: complete
+    depends_on:
+      - FEATURE-001
+
+  - id: FEATURE-003
+    title: University Profile Scraper & Synthesiser
+    domain: university_profile
+    size: XL
+    assignee: null
+    status: complete
+    deployment_status: complete
+    depends_on:
+      - FEATURE-001
+      - FEATURE-002
+
+  - id: FEATURE-004
+    title: Guidance Engine
+    domain: guidance_engine
+    size: M
+    assignee: null
+    status: complete
+    deployment_status: complete
+    depends_on:
+      - FEATURE-002
+      - FEATURE-003
+
+  - id: FEATURE-005
+    title: Essay Advisor
+    domain: essay_advisor
+    size: M
+    assignee: null
+    status: complete
+    deployment_status: complete
+    depends_on:
+      - FEATURE-002
+      - FEATURE-003
+
+  - id: FEATURE-006
+    title: PDF Exporter
+    domain: pdf_exporter
+    size: S
+    assignee: null
+    status: complete
+    deployment_status: complete
+    depends_on:
+      - FEATURE-002
+      - FEATURE-004
+      - FEATURE-005
+
+  - id: FEATURE-007
+    title: Web Server & SSE Streaming
+    domain: web_server
+    size: M
+    assignee: null
+    status: complete
+    deployment_status: complete
+    depends_on:
+      - FEATURE-003
+
+  - id: FEATURE-008
+    title: Status Bar & Message Log
+    domain: status_bar
+    size: M
+    assignee: null
+    status: complete
+    deployment_status: complete
+    depends_on:
+      - FEATURE-001
+
+token_usage:
+  - phase: reverse_engineer
+    agent: reverse-engineer-agent
+    model: sonnet
+    date: 2026-06-06
+    input_tokens: 28750
+    output_tokens: 3100

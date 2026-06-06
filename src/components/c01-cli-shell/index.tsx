@@ -7,8 +7,10 @@ import { bootstrap, workspacePath, getApiKey, getModel, getTokenWindow, getConte
 import { buildStudentProfile, deleteStudentProfile, showStudentProfile } from '../c02-student-profile/index.js';
 import { buildUniversityProfile, deleteUniversityProfile, showUniversityProfile } from '../c03-university-profile/index.js';
 import { buildGuidance, showGuidance, listGuidance } from '../c04-guidance-engine/index.js';
-import { buildEssay, showEssay, listEssays } from '../c05-essay-advisor/index.js';
+import { buildEssay, showEssay, listEssays, collectEssayInputs } from '../c05-essay-advisor/index.js';
+import type { EssayInputs } from '../c05-essay-advisor/index.js';
 import { exportToPdf } from '../c06-pdf-exporter/index.js';
+import { clearMessageLog } from '../c08-status-bar/index.js';
 import { AppScreen, SpaciousSelect, waitForText, withSpinner } from '../../utils/tui.js';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -192,7 +194,11 @@ async function screenStudentContext(nav: Nav, error?: string): Promise<Nav> {
   ];
   const val = await showMenu(items, 'Student', ctx(nav), error);
 
-  if (val === '__back' || val === '__esc') return screenStudentSelect({ studentSlug: undefined, universitySlug: undefined });
+  if (val === '__back' || val === '__esc') {
+    // [C08] Clear messages on menu navigation return
+    clearMessageLog('menu-return');
+    return screenStudentSelect({ studentSlug: undefined, universitySlug: undefined });
+  }
   if (val === '__view') {
     try {
       const { markdownPath } = await showStudentProfile(nav.studentSlug!);
@@ -236,7 +242,11 @@ async function screenUniversityContext(nav: Nav, error?: string): Promise<Nav> {
   ];
   const val = await showMenu(items, 'University', ctx(nav), error);
 
-  if (val === '__back' || val === '__esc') return screenStudentContext({ ...nav, universitySlug: undefined });
+  if (val === '__back' || val === '__esc') {
+    // [C08] Clear messages on menu navigation return
+    clearMessageLog('menu-return');
+    return screenStudentContext({ ...nav, universitySlug: undefined });
+  }
   if (val === '__view') {
     try {
       const { markdownPath } = await showUniversityProfile(nav.studentSlug!, nav.universitySlug!);
@@ -298,7 +308,11 @@ async function screenGuidanceList(nav: Nav, error?: string): Promise<Nav> {
   ];
   const val = await showMenu(items, 'Guidance', ctx(nav), error);
 
-  if (val === '__back' || val === '__esc') return screenUniversityContext(nav);
+  if (val === '__back' || val === '__esc') {
+    // [C08] Clear messages on menu navigation return
+    clearMessageLog('menu-return');
+    return screenUniversityContext(nav);
+  }
   if (!getApiKey()) return screenUniversityContext(nav, 'Gemini API key not configured. Go to Config to set it.');
 
   try {
@@ -317,7 +331,7 @@ async function screenGuidanceList(nav: Nav, error?: string): Promise<Nav> {
       const result = await showGuidance(nav.studentSlug!, nav.universitySlug!, val);
       markdownPath = result.markdownPath;
     }
-    return screenPdfPrompt(nav, markdownPath, 'university');
+    return screenPdfPrompt(nav, markdownPath, 'guidance');
   } catch (err) {
     return screenUniversityContext(nav, err instanceof Error ? err.message : String(err));
   }
@@ -333,16 +347,23 @@ async function screenEssayList(nav: Nav, error?: string): Promise<Nav> {
   ];
   const val = await showMenu(items, 'Essays', ctx(nav), error);
 
-  if (val === '__back' || val === '__esc') return screenUniversityContext(nav);
+  if (val === '__back' || val === '__esc') {
+    // [C08] Clear messages on menu navigation return
+    clearMessageLog('menu-return');
+    return screenUniversityContext(nav);
+  }
   if (!getApiKey()) return screenUniversityContext(nav, 'Gemini API key not configured. Go to Config to set it.');
 
   try {
     let markdownPath: string;
     if (val === '__new') {
       const timestamp = makeTimestamp();
-      // [C01-F11] Spinner while Gemini generates essay guidance
+      // [C05-F01] Collect essay inputs interactively before starting the spinner
+      const inputs: EssayInputs | null = await collectEssayInputs(nav.studentSlug!, nav.universitySlug!, timestamp);
+      if (!inputs) return screenEssayList(nav);
+      // [C01-F11] Spinner wraps only the AI + file-write portion
       const result = await withSpinner(
-        buildEssay(nav.studentSlug!, nav.universitySlug!, timestamp),
+        buildEssay(nav.studentSlug!, nav.universitySlug!, timestamp, inputs),
         'Generating essay guidance — this may take a minute…',
         'Essay',
         ctx(nav),
@@ -352,28 +373,47 @@ async function screenEssayList(nav: Nav, error?: string): Promise<Nav> {
       const result = await showEssay(nav.studentSlug!, nav.universitySlug!, val);
       markdownPath = result.markdownPath;
     }
-    return screenPdfPrompt(nav, markdownPath, 'university');
+    return screenPdfPrompt(nav, markdownPath, 'essay');
   } catch (err) {
     return screenUniversityContext(nav, err instanceof Error ? err.message : String(err));
   }
 }
 
 // [C01-F08] PDF prompt — returnTo controls where Back/Esc lands
-async function screenPdfPrompt(nav: Nav, markdownPath: string, returnTo: 'student' | 'university'): Promise<Nav> {
+async function screenPdfPrompt(nav: Nav, markdownPath: string, returnTo: 'student' | 'university' | 'guidance' | 'essay'): Promise<Nav> {
   const items = [
     { label: 'Yes — Export to PDF', value: 'yes' },
     { label: 'No — Return to menu', value: 'no' },
   ];
   const val = await showMenu(items, 'Export to PDF?', ctx(nav));
   if (val === 'yes') {
+    let pdfPath: string | undefined;
+    let exportError: string | undefined;
     try {
-      const { pdfPath } = await exportToPdf(markdownPath);
-      process.stdout.write(`\nPDF saved: ${pdfPath}\n`);
+      const result = await withSpinner(
+        exportToPdf(markdownPath),
+        'Exporting to PDF…',
+        'Export to PDF',
+        ctx(nav),
+      );
+      pdfPath = result.pdfPath;
     } catch (err) {
-      process.stderr.write(`PDF export failed: ${err instanceof Error ? err.message : String(err)}\n`);
+      exportError = err instanceof Error ? err.message : String(err);
+    }
+    // Show result screen before returning to parent menu
+    const resultItems = [{ label: 'Continue', value: 'ok' }];
+    if (pdfPath) {
+      await showMenu(resultItems, 'PDF Exported', `${ctx(nav) ?? ''}   ✓ Saved: ${pdfPath}`);
+    } else {
+      await showMenu(resultItems, 'Export to PDF', ctx(nav), `PDF export failed: ${exportError ?? 'unknown error'}`);
     }
   }
-  return returnTo === 'student' ? screenStudentContext(nav) : screenUniversityContext(nav);
+  // [C08] Clear messages on returning to a parent menu
+  clearMessageLog('menu-return');
+  if (returnTo === 'student') return screenStudentContext(nav);
+  if (returnTo === 'guidance') return screenGuidanceList(nav);
+  if (returnTo === 'essay') return screenEssayList(nav);
+  return screenUniversityContext(nav);
 }
 
 // ─── Entry point ──────────────────────────────────────────────────────────────

@@ -6,6 +6,7 @@ import { writeFile, readFile, fileExists } from '../../utils/fileUtils.js';
 import { toSlug } from '../../utils/slugUtils.js';
 import { loadPrompt } from '../../ai/promptLoader.js';
 import { waitForSelect, waitForText, dotLeader, type SelectItem } from '../../utils/tui.js';
+import { postMessage } from '../c08-status-bar/index.js';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -820,6 +821,9 @@ async function enhanceProfile(data: ProfileData): Promise<ProfileData> {
   const model = genAI.getGenerativeModel({ model: modelName, generationConfig: { temperature: 0.2 } });
   const prompt = await loadPrompt('c02-profile-enhance', { PROFILE_JSON: JSON.stringify(data, null, 2) });
 
+  // [C08] Signal Gemini call start
+  postMessage('Gemini: enhancing student profile…', 'progress', 'C02');
+
   async function attempt(): Promise<ProfileData> {
     const result = await model.generateContent(prompt);
     const raw = result.response.text().trim();
@@ -828,13 +832,22 @@ async function enhanceProfile(data: ProfileData): Promise<ProfileData> {
   }
 
   try {
-    return await attempt();
+    const enhanced = await attempt();
+    // [C08] Signal Gemini call complete
+    postMessage('Gemini: profile enhancement complete', 'success', 'C02');
+    return enhanced;
   } catch {
+    // [C08] Signal retry
+    postMessage('Gemini: enhancement error — retrying in 30 s…', 'warning', 'C02');
     console.log('Retrying enhancement in 30 seconds...');
     await new Promise(r => setTimeout(r, 30000));
     try {
-      return await attempt();
+      const enhanced = await attempt();
+      postMessage('Gemini: profile enhancement complete (retry)', 'success', 'C02');
+      return enhanced;
     } catch {
+      // [C08] Signal fallback
+      postMessage('Gemini: profile enhancement unavailable — saved with original text', 'error', 'C02');
       console.log('Profile enhancement unavailable — saved with original text.');
       return data;
     }
@@ -1016,11 +1029,16 @@ async function mainMenu(slug: string, data: ProfileData): Promise<void> {
     if (choice === 'finalize') {
       if (!complete) continue;
       data.lastUpdated = new Date().toISOString().split('T')[0];
+      // [C08] Signal profile save start
+      postMessage('Saving profile data…', 'progress', 'C02');
       await saveJson(slug, data);
       console.log('Enhancing your profile...');
+      // enhanceProfile() posts its own progress/success/error messages
       const enhanced = await enhanceProfile(data);
       const markdown = renderProfileMarkdown(enhanced);
       await writeFile(mdPath(slug), markdown);
+      // [C08] Signal profile.md saved successfully
+      postMessage(`Profile saved: students/${slug}/profile.md`, 'success', 'C02');
       console.log(`Profile saved: data/students/${slug}/profile.md`);
       return;
     }

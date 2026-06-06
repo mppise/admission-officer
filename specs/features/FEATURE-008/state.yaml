@@ -1,0 +1,29 @@
+id: FEATURE-008
+title: Status Bar & Message Log
+domain: status_bar
+assignee: null
+phase_gates:
+  feature_spec_complete: true
+  spec_reviewed: true
+  dev_complete: true
+  tests_passing: true
+blockers: []
+token_usage:
+  - phase: feature_spec
+    agent: feature-spec-agent
+    model: sonnet
+    date: 2026-06-06
+    input_tokens: 2400
+    output_tokens: 800
+  - phase: development
+    agent: dev-agent
+    model: sonnet
+    date: 2026-06-06
+    input_tokens: 18200
+    output_tokens: 5400
+  - phase: testing
+    agent: test-agent
+    model: haiku
+    date: 2026-06-06
+    input_tokens: 3100
+    output_tokens: 420

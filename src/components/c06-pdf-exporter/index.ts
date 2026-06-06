@@ -4,6 +4,7 @@ import { promises as fs } from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { ensureBrowsersInstalled } from '../../utils/ensure-browsers.js';
+import { postMessage } from '../c08-status-bar/index.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 // CSS is copied to dist/components/c06-pdf-exporter/styles/ at build time (see package.json build script)
@@ -52,6 +53,7 @@ async function renderPdf(htmlContent: string, pdfPath: string): Promise<void> {
   } catch (err) {
     // Browser launch failed - ensure browsers are installed and retry
     console.log('Browser not ready, installing...');
+    postMessage('Puppeteer: browser not ready — installing…', 'warning', 'C06');
     try {
       await ensureBrowsersInstalled();
       browser = await puppeteer.launch({ headless: true });
@@ -101,8 +103,15 @@ export async function exportToPdf(markdownPath: string): Promise<{ pdfPath: stri
 
   const pdfPath = markdownPath.replace(/\.md$/, '.pdf');
 
+  // [C08] Signal PDF export start
+  const fileName = path.basename(pdfPath);
+  postMessage(`Puppeteer: exporting ${fileName}…`, 'progress', 'C06');
+
   const htmlContent = await markdownToHtml(markdownContent);
   await renderPdf(htmlContent, pdfPath);
+
+  // [C08] Signal PDF export complete
+  postMessage(`Puppeteer: PDF saved — ${fileName}`, 'success', 'C06');
 
   return { pdfPath };
 }

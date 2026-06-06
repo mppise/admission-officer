@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { render, Box, Text, useInput, useApp } from 'ink';
 import { TextInput } from '@inkjs/ui';
+import { getCurrentMessage, getAllMessages, StatusFooter, MessageLogModal } from '../components/c08-status-bar/index.js';
+import type { Message } from '../components/c08-status-bar/index.js';
 
 // ─── Shared full-screen TUI layout and prompt helpers ─────────────────────────
 //
@@ -20,6 +22,28 @@ export function dotLeader(label: string, status: string, width = 28): string {
   return `${label}${'·'.repeat(gap)}${status}`;
 }
 
+// ─── Modal open callback ──────────────────────────────────────────────────────
+// AppScreen registers its setModalOpen setter here so openMessageLogModal()
+// (called from anywhere) can trigger the modal without access to React state.
+// There is only ever one AppScreen mounted at a time, so a module-level ref is safe.
+
+type SetModalOpen = (open: boolean) => void;
+let _setModalOpen: SetModalOpen | null = null;
+
+export function registerModalOpener(setter: SetModalOpen): void {
+  _setModalOpen = setter;
+}
+
+export function unregisterModalOpener(): void {
+  _setModalOpen = null;
+}
+
+export function triggerOpenMessageLogModal(): void {
+  if (_setModalOpen) {
+    _setModalOpen(true);
+  }
+}
+
 // ─── Layout ───────────────────────────────────────────────────────────────────
 
 interface AppScreenProps {
@@ -34,6 +58,44 @@ interface AppScreenProps {
 export function AppScreen({ subtitle, contextLine, hint, children, footerHint, footerEsc }: AppScreenProps) {
   const cols = Math.min(process.stdout.columns ?? 80, 100);
   const bar = '▓▒░' + '─'.repeat(Math.max(0, cols - 10)) + '░▒▓';
+
+  const [currentMsg, setCurrentMsg] = useState<Message | null>(getCurrentMessage());
+  const [allMsgs, setAllMsgs] = useState<Message[]>(getAllMessages());
+  const [modalOpen, setModalOpen] = useState(false);
+
+  // Register the modal opener so external callers (openMessageLogModal) can trigger it
+  useEffect(() => {
+    registerModalOpener(setModalOpen);
+    return () => {
+      unregisterModalOpener();
+    };
+  }, []);
+
+  // Poll for new messages every 250 ms so the footer stays current while Gemini / Playwright run
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setCurrentMsg(getCurrentMessage());
+      setAllMsgs(getAllMessages());
+    }, 250);
+    return () => clearInterval(interval);
+  }, []);
+
+  // Esc closes the modal when it is open; do not propagate to the underlying menu
+  useInput((_ch, key) => {
+    if (modalOpen && key.escape) {
+      setModalOpen(false);
+    }
+  });
+
+  if (modalOpen) {
+    return (
+      <MessageLogModal
+        messages={allMsgs}
+        isOpen={true}
+        onClose={() => setModalOpen(false)}
+      />
+    );
+  }
 
   return (
     <Box flexDirection="column" minHeight={process.stdout.rows ?? 24}>
@@ -69,6 +131,11 @@ export function AppScreen({ subtitle, contextLine, hint, children, footerHint, f
       {/* CONTENT */}
       <Box flexGrow={1} flexDirection="column" paddingX={4} paddingY={1}>
         {children}
+      </Box>
+
+      {/* STATUS FOOTER — latest C08 message */}
+      <Box paddingX={4} paddingBottom={0}>
+        <StatusFooter currentMessage={currentMsg} onEnter={() => setModalOpen(true)} />
       </Box>
 
       {/* FOOTER */}

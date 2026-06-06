@@ -4,6 +4,7 @@ import { workspacePath } from '../../config/bootstrap.js';
 import { writeFile, readFile, fileExists } from '../../utils/fileUtils.js';
 import { loadPrompt } from '../../ai/promptLoader.js';
 import { getApiKey, getModel } from '../../config/bootstrap.js';
+import { postMessage } from '../c08-status-bar/index.js';
 
 async function withRetry<T>(fn: () => Promise<T>, label: string): Promise<T> {
   try {
@@ -46,6 +47,9 @@ export async function buildGuidance(
   const genAI = new GoogleGenerativeAI(apiKey);
   const model = genAI.getGenerativeModel({ model: modelName, generationConfig: { temperature: 0.7 } });
 
+  // [C08] Signal guidance generation start
+  postMessage(`Gemini: generating guidance report for ${uniSlug}…`, 'progress', 'C04');
+
   const result = await withRetry(() => model.generateContent(prompt), 'Gemini guidance generation');
   const guidanceMarkdown = result.response.text().trim();
   if (!guidanceMarkdown) throw new Error('Gemini returned empty response. Try again.');
@@ -54,6 +58,10 @@ export async function buildGuidance(
   await fs.mkdir(dir, { recursive: true });
   const reportPath = `${dir}/guidance.md`;
   await writeFile(reportPath, guidanceMarkdown + '\n');
+
+  // [C08] Signal guidance report saved
+  postMessage(`Gemini: guidance report saved (${uniSlug}/${timestamp})`, 'success', 'C04');
+
   return { reportPath, timestamp };
 }
 

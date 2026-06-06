@@ -2,6 +2,7 @@
 
 import { addMessage, clearQueue, getCurrentMessage, getAllMessages } from './messageQueue.js';
 import { MessageType, Message } from './types.js';
+import { triggerOpenMessageLogModal } from '../../utils/tui.js';
 
 /**
  * [C08-F01, C08-F02, C08-F03] Post a message to the status bar and log
@@ -21,11 +22,10 @@ export function clearMessageLog(context: 'context-change' | 'menu-return'): void
 
 /**
  * [C08-F04, C08-F05] Open the full-screen message log modal
- * Called by tui.tsx (Enter on footer) or C01 (menu option)
+ * Triggers the modal opener registered by the currently-mounted AppScreen in tui.tsx.
  */
 export async function openMessageLogModal(): Promise<void> {
-  // This will be integrated with the menu system
-  // For now, just a placeholder
+  triggerOpenMessageLogModal();
 }
 
 /**

@@ -6,6 +6,7 @@ import { djb2Hash, ESSAY_TYPE_SLUGS } from '../../utils/slugUtils.js';
 import { loadPrompt } from '../../ai/promptLoader.js';
 import { getApiKey, getModel } from '../../config/bootstrap.js';
 import { waitForSelect, waitForText, waitForConfirm } from '../../utils/tui.js';
+import { postMessage } from '../c08-status-bar/index.js';
 
 async function withRetry<T>(fn: () => Promise<T>, label: string): Promise<T> {
   try {
@@ -17,12 +18,21 @@ async function withRetry<T>(fn: () => Promise<T>, label: string): Promise<T> {
   }
 }
 
-// [C05-F01, C05-F02, C05-F03, C05-F04]
-export async function buildEssay(
+export interface EssayInputs {
+  essayType: string;
+  essayPrompt: string;
+  wordLimit: string;
+  essayPath: string;
+  dir: string;
+  alreadyExists: boolean;
+}
+
+// [C05-F01] Collect essay inputs interactively — must be called before withSpinner
+export async function collectEssayInputs(
   studentSlug: string,
   uniSlug: string,
   timestamp: string,
-): Promise<{ essayPath: string; timestamp: string }> {
+): Promise<EssayInputs | null> {
   const studentProfilePath = workspacePath('students', studentSlug, 'profile.md');
   const uniProfilePath = workspacePath('students', studentSlug, 'universities', uniSlug, 'profile.md');
 
@@ -33,7 +43,6 @@ export async function buildEssay(
     throw new Error('No university profile found. Build a university profile first.');
   }
 
-  // [C05-F01] Collect essay details via tui.tsx
   const essayType = await waitForSelect(
     Object.keys(ESSAY_TYPE_SLUGS).map(t => ({ label: t, value: t })),
     'Essay Advisor › Essay Type',
@@ -55,23 +64,35 @@ export async function buildEssay(
   );
   const wordLimit = wordLimitRaw.trim() || 'Not specified';
 
-  // Overwrite check within the dated dir
   const typeSlug = ESSAY_TYPE_SLUGS[essayType] ?? 'essay';
   const hash = djb2Hash(essayPrompt.trim());
   const dir = workspacePath('students', studentSlug, 'universities', uniSlug, 'essays', timestamp);
   const essayPath = `${dir}/${typeSlug}-${hash}.md`;
 
-  if (await fileExists(essayPath)) {
+  const alreadyExists = await fileExists(essayPath);
+  if (alreadyExists) {
     const overwrite = await waitForConfirm(
       'An essay outline already exists for this timestamp. Overwrite?',
       'Essay Advisor › Overwrite?',
       `${essayType}   Student: ${studentSlug}`,
     );
-    if (!overwrite) {
-      return { essayPath, timestamp };
-    }
+    if (!overwrite) return null;
   }
 
+  return { essayType, essayPrompt, wordLimit, essayPath, dir, alreadyExists };
+}
+
+// [C05-F02, C05-F03, C05-F04] Generate essay — call after collectEssayInputs
+export async function buildEssay(
+  studentSlug: string,
+  uniSlug: string,
+  timestamp: string,
+  inputs: EssayInputs,
+): Promise<{ essayPath: string; timestamp: string }> {
+  const { essayType, essayPrompt, wordLimit, essayPath, dir } = inputs;
+
+  const studentProfilePath = workspacePath('students', studentSlug, 'profile.md');
+  const uniProfilePath = workspacePath('students', studentSlug, 'universities', uniSlug, 'profile.md');
   const studentProfileContent = await readFile(studentProfilePath);
   const universityProfileContent = await readFile(uniProfilePath);
 
@@ -90,6 +111,9 @@ export async function buildEssay(
   const genAI = new GoogleGenerativeAI(apiKey);
   const model = genAI.getGenerativeModel({ model: modelName, generationConfig: { temperature: 0.8 } });
 
+  // [C08] Signal essay generation start
+  postMessage(`Gemini: generating ${essayType} essay guidance…`, 'progress', 'C05');
+
   const result = await withRetry(() => model.generateContent(prompt), 'Gemini essay generation');
   const essayMarkdown = result.response.text().trim();
   if (!essayMarkdown) throw new Error('Gemini returned empty response. Try again.');
@@ -99,6 +123,9 @@ export async function buildEssay(
 
   await fs.mkdir(dir, { recursive: true });
   await writeFile(essayPath, finalMarkdown + '\n');
+
+  // [C08] Signal essay file saved
+  postMessage(`Gemini: essay guidance saved (${uniSlug}/${timestamp})`, 'success', 'C05');
 
   return { essayPath, timestamp };
 }

@@ -6,6 +6,7 @@ import { workspacePath, getApiKey, getModel } from '../../config/bootstrap.js';
 import { writeFile, readFile, fileExists, ensureDir } from '../../utils/fileUtils.js';
 import { toSlug } from '../../utils/slugUtils.js';
 import { loadPrompt } from '../../ai/promptLoader.js';
+import { postMessage } from '../c08-status-bar/index.js';
 
 // GEMINI_TOKEN_WINDOW / GEMINI_CONTENT_BUDGET_PCT still read from env for C03 batch sizing
 function getGeminiApiKey(): string { return getApiKey() ?? ''; }
@@ -275,11 +276,15 @@ async function flushBatch(
   if (pendingBatch.length === 0) return { pendingBatch, pendingBatchChars, batchCount };
   batchCount++;
   process.stdout.write(`\n  Extracting batch ${batchCount} (${pendingBatch.length} pages, ~${Math.round(pendingBatchChars / 1000)}k chars)...`);
+  // [C08] Signal batch extraction start
+  postMessage(`Gemini: extracting facts from batch ${batchCount} (${pendingBatch.length} pages)…`, 'progress', 'C03');
   const facts = await extractBatchFacts(pendingBatch, intendedMajors, genAI, stats);
   if (facts === null) {
     // Hard failure — leave pages as 'scraped' with text intact so next resume retries this batch
     await saveProfileJson(jsonPath, profileData);
     process.stdout.write(` FAILED (Gemini unreachable — will retry on next run)`);
+    // [C08] Signal batch failure
+    postMessage(`Gemini: batch ${batchCount} extraction failed — will retry on next run`, 'error', 'C03');
     return { pendingBatch: [], pendingBatchChars: 0, batchCount };
   }
   let totalFacts = 0;
@@ -298,6 +303,8 @@ async function flushBatch(
   }
   await saveProfileJson(jsonPath, profileData);
   process.stdout.write(` done. (${totalFacts} facts total)`);
+  // [C08] Signal batch extraction complete
+  postMessage(`Gemini: batch ${batchCount} done — ${totalFacts} facts accumulated`, 'success', 'C03');
   return { pendingBatch: [], pendingBatchChars: 0, batchCount };
 }
 
@@ -402,6 +409,10 @@ async function crawlAndExtract(
       queue.push(...lowPriority);
 
       process.stdout.write(`\r  [${visited.size}/${MAX_CRAWL_PAGES}] Scraping: ${url.replace(origin, '') || '/'}...         `);
+      // [C08] Post scraper progress every 10 pages to avoid flooding the queue
+      if (visited.size % 10 === 0 || visited.size === 1) {
+        postMessage(`Playwright: scraped ${visited.size}/${MAX_CRAWL_PAGES} pages — ${url.replace(origin, '') || '/'}`, 'progress', 'C03');
+      }
 
       const text = await extractPageText(page);
 
@@ -478,6 +489,9 @@ async function synthesiseProfile(
     generationConfig: { temperature: 0.2 },
   });
 
+  // [C08] Signal synthesis start
+  postMessage('Gemini: synthesising university profile…', 'progress', 'C03');
+
   const result = await withRetry(
     () => model.generateContent(prompt),
     'Gemini university synthesis',
@@ -494,7 +508,10 @@ async function synthesiseProfile(
   const jsonStr = raw.replace(/^```(?:json)?\n?/, '').replace(/\n?```$/, '').trim();
 
   try {
-    return JSON.parse(jsonStr) as UniversityProfileData;
+    const profileResult = JSON.parse(jsonStr) as UniversityProfileData;
+    // [C08] Signal synthesis complete
+    postMessage('Gemini: university profile synthesis complete', 'success', 'C03');
+    return profileResult;
   } catch {
     throw new Error('Gemini returned unparseable JSON for university synthesis.');
   }
@@ -653,8 +670,12 @@ export async function buildUniversityProfile(
 
   // Pass 1 — BFS crawl + per-page Gemini extraction → profile.json
   console.log(`Crawling ${domain} (up to ${MAX_CRAWL_PAGES} pages)...`);
+  // [C08] Signal crawl start
+  postMessage(`Playwright: starting crawl of ${domain}…`, 'progress', 'C03');
   const crawledData = await crawlAndExtract(domain, jsonFilePath, profileData, intendedMajors, stats);
   console.log(`  Pass 1 complete: ${crawledData.pages.length} pages processed.`);
+  // [C08] Signal Pass 1 complete
+  postMessage(`Playwright: crawl complete — ${crawledData.pages.length} pages processed`, 'success', 'C03');
 
   // Report category coverage
   for (const cat of allCategories(intendedMajors)) {
@@ -664,11 +685,14 @@ export async function buildUniversityProfile(
 
   // Pass 2 — synthesise profile.json → profile.md
   console.log('Synthesising university profile...');
+  // synthesiseProfile() posts its own progress/success messages
   const profileJsonData = await synthesiseProfile(crawledData, intendedMajorsLabel, existingProfile, stats);
 
   // [C03-F03] Write profile.md
   const markdown = renderUniversityMarkdown(profileJsonData, domain, intendedMajorsLabel, generatedDate);
   await writeFile(profilePath, markdown);
+  // [C08] Signal overall university profile save
+  postMessage(`University profile saved: ${slug}/profile.md`, 'success', 'C03');
 
   // Run statistics summary
   const modelUsed = getGeminiModel();
