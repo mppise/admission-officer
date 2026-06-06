@@ -80,8 +80,8 @@ backlog:
     size: "l"
     assignee: null
     dependencies: []
-    status: "backlog"
-    deployment_status: null
+    status: "complete"
+    deployment_status: "complete"
 
 releases:
   - version: "v4.0.0"

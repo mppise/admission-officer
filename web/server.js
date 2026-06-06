@@ -38,8 +38,7 @@ app.post('/api/scrape-university', async (req, res) => {
 
 async function crawlUniversityWebsite(domain) {
   const browser = await chromium.launch();
-  const context = await browser.createBrowserContext();
-  const page = await context.newPage();
+  const page = await browser.newPage();
 
   const baseUrl = domain.startsWith('http') ? domain : `https://${domain}`;
   const visited = new Set();
