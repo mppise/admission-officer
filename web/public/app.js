@@ -1658,10 +1658,21 @@ function exportGuidancePdf() {
     useCORS: true,
     allowTaint: true,
     onclone: (clonedDocument) => {
+      // Remove all inline styles that might override PDF styles
+      clonedDocument.querySelectorAll('*').forEach(el => {
+        el.removeAttribute('style');
+      });
+
+      // Add aggressive overrides for all text
       const styles = clonedDocument.createElement('style');
       styles.innerHTML = `
-        h2 { color: #4f46e5 !important; }
-        h3 { color: #1f2937 !important; }
+        * { font-size: inherit !important; }
+        html, body { font-size: 9px !important; }
+        h1, h2, h3, h4, h5, h6 { font-weight: 600 !important; line-height: 1.2 !important; }
+        h1 { font-size: 16px !important; margin: 8px 0 4px 0 !important; }
+        h2 { font-size: 13px !important; margin: 8px 0 4px 0 !important; color: #4f46e5 !important; }
+        h3 { font-size: 11px !important; margin: 6px 0 3px 0 !important; }
+        p, span, div, li { font-size: 9px !important; }
       `;
       clonedDocument.head.appendChild(styles);
     },
@@ -1762,6 +1773,25 @@ function exportAllEssaysPdf() {
     compress: true,
     useCORS: true,
     allowTaint: true,
+    onclone: (clonedDocument) => {
+      // Remove all inline styles that might override PDF styles
+      clonedDocument.querySelectorAll('*').forEach(el => {
+        el.removeAttribute('style');
+      });
+
+      // Add aggressive overrides for all text
+      const styles = clonedDocument.createElement('style');
+      styles.innerHTML = `
+        * { font-size: inherit !important; }
+        html, body { font-size: 9px !important; }
+        h1, h2, h3, h4, h5, h6 { font-weight: 600 !important; line-height: 1.2 !important; }
+        h1 { font-size: 16px !important; margin: 8px 0 4px 0 !important; }
+        h2 { font-size: 13px !important; margin: 8px 0 4px 0 !important; color: #4f46e5 !important; }
+        h3 { font-size: 11px !important; margin: 6px 0 3px 0 !important; }
+        p, span, div, li { font-size: 9px !important; }
+      `;
+      clonedDocument.head.appendChild(styles);
+    },
     callback: (pdf) => {
       pdf.save(`${uni.universityName}_essays.pdf`);
     }
