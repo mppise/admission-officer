@@ -7,7 +7,7 @@
     "ao": "dist/components/c01-cli-shell/index.js"
   },
   "scripts": {
-    "build": "tsc && mkdir -p dist/ai/prompts && cp src/ai/prompts/*.md dist/ai/prompts/ && mkdir -p dist/components/c06-pdf-exporter/styles && cp src/components/c06-pdf-exporter/styles/*.css dist/components/c06-pdf-exporter/styles/ && mkdir -p dist/web/public && cp web/server.js dist/web/ && cp web/public/* dist/web/public/ && chmod +x dist/components/c01-cli-shell/index.js",
+    "build": "tsc && mkdir -p dist/ai/prompts && cp src/ai/prompts/*.md dist/ai/prompts/ && mkdir -p dist/components/c06-pdf-exporter/styles && cp src/components/c06-pdf-exporter/styles/*.css dist/components/c06-pdf-exporter/styles/ && mkdir -p dist/web/public && cp web/server.js dist/web/ && cp web/public/* dist/web/public/ && chmod +x dist/components/c01-cli-shell/index.js dist/web/server.js",
     "prepare": "npm run build",
     "start": "node dist/components/c01-cli-shell/index.js",
     "web": "node scripts/start-web.js",
