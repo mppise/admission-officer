@@ -549,12 +549,9 @@
                       <button class="btn btn-primary" id="btnGenerateGuidance" disabled>
                         <i class="fas fa-wand-magic-sparkles"></i> Generate Guidance
                       </button>
-                      <button class="btn btn-outline-secondary" id="btnExportGuidancePdf" disabled style="margin-left: 0.5rem;">
-                        <i class="fas fa-download"></i> Export PDF
-                      </button>
                     </div>
                     <div id="guidanceContainer" style="display: none; margin-bottom: 2rem;">
-                      <div id="guidanceContent" style="background: #f9fafb; padding: 1.5rem; border-radius: 8px; border: 1px solid #e5e7eb; max-height: 600px; overflow-y: auto;"></div>
+                      <textarea id="guidanceContent" class="form-control" rows="20" readonly style="font-family: monospace; font-size: 0.875rem; resize: vertical;"></textarea>
                     </div>
 
                     <!-- Essay Guidance Section -->
@@ -572,11 +569,6 @@
                       </button>
                     </div>
                     <div id="essayGuidanceList" class="mb-4"></div>
-                    <div class="mb-3">
-                      <button class="btn btn-outline-secondary" id="btnExportAllEssaysPdf" disabled>
-                        <i class="fas fa-download"></i> Export All Essays as PDF
-                      </button>
-                    </div>
                   </div>
                 </div>
               </div>
@@ -623,6 +615,7 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/dompurify/3.0.6/purify.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
   <script src="/app.js"></script>
 </body>
 </html>

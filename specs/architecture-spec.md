@@ -2,6 +2,7 @@
 
 **Reverse-engineered from:** existing codebase
 **Date:** 2026-06-06
+**Last updated:** 2026-06-06
 **Author:** Mangesh Pise
 
 ---
@@ -28,6 +29,7 @@ The system integrates the Google Gemini AI API to enhance student profiles, scra
 | Web scraping | Playwright (Chromium, CLI) / Playwright (Web) |
 | PDF export | Puppeteer + marked (markdown→HTML→PDF) |
 | Web server | Express 4 |
+| Web UI markdown rendering | marked (CDN) + DOMPurify (CDN) |
 | Config | dotenv — workspace-local `.env` at `university-ao/.env` |
 
 ---
@@ -96,9 +98,9 @@ screenStudentSelect
        └─ screenUniversityContext (university selected)
             ├─ screenDeleteUniversity
             ├─ screenGuidanceList
-            │    └─ screenPdfPrompt
+            │    └─ showMarkdownScreen (inline viewer, replaces screenPdfPrompt)
             └─ screenEssayList
-                 └─ screenPdfPrompt
+                 └─ showMarkdownScreen (inline viewer, replaces screenPdfPrompt)
 ```
 
 **Key invariants:**
@@ -106,6 +108,8 @@ screenStudentSelect
 - Config (API key, model, token window, content budget %) is managed in-process via `process.env` mutation and persisted via `saveConfig()` which writes `university-ao/.env`
 - Escape on Student Select exits the process; Escape on all other screens goes to the parent screen
 - `withSpinner()` wraps all long-running Playwright + Gemini operations
+- API key validation for guidance/essay is gated on the `__new` (generate) branch only — viewing existing reports does not require an API key
+- `showMarkdownScreen()` is a full-screen Ink scrollable viewer: `↑`/`↓`/`PgUp`/`PgDn` to scroll, `↵`/`Esc` to return
 
 ### C02 — Student Profile (`src/components/c02-student-profile/index.tsx`)
 
@@ -180,6 +184,8 @@ CSS path resolves relative to `dist/components/c06-pdf-exporter/styles/pdf.css` 
 
 Auto-installs Puppeteer Chrome if browser launch fails.
 
+**Scope in v1.0:** Invoked from the CLI for student profile and university profile export. Not invoked from guidance/essay flows (those now use `showMarkdownScreen` inline viewer). Not available from the web UI for guidance or essay content.
+
 ### C07 — (Reserved slot, not implemented)
 
 ### C08 — Status Bar & Message Log (`src/components/c08-status-bar/`)
@@ -203,10 +209,12 @@ Express app on port 3000 (configurable via `PORT` env). Static files served from
 | GET | `/api/health` | Health check |
 | POST | `/api/scrape-university` | Synchronous university scrape (blocking) |
 | POST | `/api/scrape-university-stream` | SSE-streamed university scrape with progress |
-| POST | `/api/generate-guidance` | Guidance report generation (inline prompt, not .prompt.md) |
-| POST | `/api/generate-essay-guidance` | Essay guidance (inline prompt, not .prompt.md) |
+| POST | `/api/generate-guidance` | Guidance report generation — returns plain markdown |
+| POST | `/api/generate-essay-guidance` | Essay guidance — returns plain markdown |
 
-The web server uses `universityScraper.ts` for the scrape pipeline. Guidance and essay generation use inline hardcoded prompts (not the `.prompt.md` files used by CLI components). HTML output is Bootstrap-styled.
+The web server uses `universityScraper.ts` for the scrape pipeline. Guidance and essay generation use inline hardcoded prompts (not the `.prompt.md` files used by CLI components). Both endpoints now return **plain markdown**; the browser renders it via `marked` + `DOMPurify`.
+
+**Web UI PDF export:** `btnExportGuidancePdf` and `btnExportAllEssaysPdf` have been removed. Guidance and essay content are display-only in the web UI. Student profile (`btnExportStudentPdf`) and university profile (`btnExportUniversityPdf`) export buttons remain.
 
 ---
 
@@ -241,12 +249,12 @@ university-ao/
           guidance/
             {YYYY-MM-DD-HHmm}/
               guidance.md
-              guidance.pdf                — generated on export
           essays/
             {YYYY-MM-DD-HHmm}/
               {typeSlug}-{hash}.md
-              {typeSlug}-{hash}.pdf       — generated on export
 ```
+
+Note: `.pdf` files are no longer generated for guidance or essay content. PDF generation remains available only for `profile.md` files (student and university).
 
 ---
 
@@ -262,7 +270,7 @@ All CLI prompts are stored as `.prompt.md` files under `src/ai/prompts/` with YA
 | `c04-guidance-generate` | C04 | Generate prescriptive admissions guidance report |
 | `c05-essay-generate` | C05 | Generate essay outline + inspiration samples |
 
-**Web server difference:** The web server's guidance and essay endpoints use hardcoded inline prompts that request Bootstrap-styled HTML rather than the markdown output format used by CLI prompts.
+**Web server prompts:** The web server's guidance and essay endpoints use hardcoded inline prompts that request plain markdown output. This aligns web server output format with the CLI's markdown-first approach.
 
 ---
 
@@ -281,8 +289,9 @@ All CLI prompts are stored as `.prompt.md` files under `src/ai/prompts/` with YA
 | Gap | Component | Impact |
 | :-- | :-------- | :----- |
 | C08 Status Bar not integrated | C08 / C01 | No in-app progress messages during Gemini/Playwright operations; only spinner overlay |
-| Web server uses inline prompts | Web Server | Divergence from CLI prompt quality; web guidance/essay prompts are less structured |
+| Web server uses inline prompts | Web Server | Divergence from CLI prompt quality; web guidance/essay prompts are less structured than `.prompt.md` equivalents |
 | `jspdf` dependency unused | C06 | Dead dependency in `package.json` |
 | `html2canvas` dependency unused | C06 | Dead dependency in `package.json` |
 | `env.ts` partially redundant | Config | Some env helpers duplicated between `env.ts` and `bootstrap.ts` |
 | C07 slot unimplemented | — | Reserved component number with no implementation |
+| Guidance/essay PDF export not available | C06 / C01 | Users cannot export guidance or essay content to PDF from CLI or web UI |

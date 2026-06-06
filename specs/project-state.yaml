@@ -2,6 +2,7 @@ project_name: university-admission-officer
 release_label: v1.0
 reverse_engineered_from: existing codebase
 reverse_engineer_date: 2026-06-06
+reverse_engineer_last_updated: 2026-06-06
 author: Mangesh Pise
 
 phase_gates:
@@ -32,21 +33,25 @@ architecture_summary: |
   REST endpoints backed by server-sent events.
 
   Component layout (c0N prefix = component number):
-  - C01 CLI Shell     — navigation, screen routing, spinner, config management
+  - C01 CLI Shell     — navigation, screen routing, spinner, config management;
+                        includes showMarkdownScreen() scrollable viewer for guidance/essay display
   - C02 Student Profile — structured TUI data-entry for academic/EC/award/research/shadowing data;
                           Gemini enhancement on finalize; persists profile.json + profile.md
   - C03 University Profile — 2-pass BFS crawl (Playwright/Chromium) + Gemini batch extraction +
                               synthesis; persists profile.json (incremental) + profile.md
   - C04 Guidance Engine — reads student + university profile.md; calls Gemini; writes guidance.md
   - C05 Essay Advisor — collects essay type/prompt/word-limit via TUI; calls Gemini; writes essay .md
-  - C06 PDF Exporter  — Puppeteer markdown→HTML→PDF pipeline with Bootstrap CSS
+  - C06 PDF Exporter  — Puppeteer markdown→HTML→PDF pipeline with Bootstrap CSS;
+                        scoped to student profile and university profile only (guidance/essay PDF removed)
   - C07 (unimplemented slot)
-  - C08 Status Bar    — message queue + StatusFooter/MessageLogModal components, fully integrated
-                        into C01 AppScreen; postMessage() called by C02–C06 at all key stages
-  - Web Server        — Express server + SSE progress streaming; shares universityScraper utility
+  - C08 Status Bar    — message queue + StatusFooter/MessageLogModal components; not yet integrated
+                        into C01 AppScreen
+  - Web Server        — Express server + SSE progress streaming; shares universityScraper utility;
+                        guidance/essay endpoints return plain markdown (rendered in browser via
+                        marked + DOMPurify); PDF export buttons removed from web UI
 
   External dependencies: @google/generative-ai, ink, @inkjs/ui, playwright, puppeteer, marked,
-  express, dotenv, jspdf (unused in current release).
+  express, dotenv, jspdf (unused in current release), html2canvas (unused in current release).
 
 backlog:
   - id: FEATURE-001
@@ -140,3 +145,10 @@ token_usage:
     date: 2026-06-06
     input_tokens: 28750
     output_tokens: 3100
+  - phase: reverse_engineer
+    agent: reverse-engineer-agent
+    model: sonnet
+    date: 2026-06-06
+    input_tokens: 4200
+    output_tokens: 980
+    note: re-run to capture uncommitted codebase changes

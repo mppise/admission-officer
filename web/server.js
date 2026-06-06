@@ -113,31 +113,18 @@ ${universityProfileText}
 
 ---
 
-GENERATE BOOTSTRAP-STYLED HTML. NO <html> or <body> tags. Start with <div class="container-fluid">
-
-EVERY element MUST have Bootstrap classes:
-<div class="mb-4">
-<h2 class="text-primary fw-bold mb-3">Main Section Title</h2>
-<h3 class="fw-bold text-secondary mb-2">Subsection</h3>
-<p class="mb-2">Paragraph text here.</p>
-<ul class="list-unstyled ms-3">
-<li class="mb-2">Bullet point with <strong>emphasis</strong></li>
-<li class="mb-2">Another point</li>
-</ul>
-</div>
+OUTPUT FORMAT: Plain markdown only. No HTML tags.
 
 SECTIONS REQUIRED:
-1. <h2 class="text-primary fw-bold mb-3">University Fit Summary</h2> - How profile aligns
-2. <h2 class="text-primary fw-bold mb-3">Strengths to Highlight</h2> - 3-5 strengths with actions
-3. <h2 class="text-primary fw-bold mb-3">Key Themes</h2> - 2-4 narrative themes
-4. <h2 class="text-primary fw-bold mb-3">University-Specific Tactics</h2> - Concrete tactics
-
-OUTPUT: Valid HTML, ONLY Bootstrap classes, NO markdown, NO plain text, ONLY HTML`;
+## University Fit Summary
+## Strengths to Highlight
+## Key Themes
+## University-Specific Tactics`;
 
     const genAI = new GoogleGenerativeAI(apiKey);
     const model = genAI.getGenerativeModel({ model: modelName, generationConfig: { temperature: 0.7 } });
     const result = await model.generateContent(prompt);
-    const guidance = enhanceHtmlWithBootstrap(result.response.text().trim());
+    const guidance = result.response.text().trim();
 
     res.json({
       success: true,
@@ -189,32 +176,21 @@ ${universityProfileText}
 
 ---
 
-GENERATE BOOTSTRAP-STYLED HTML. NO <html> or <body> tags. Start with <div class="container-fluid">
+OUTPUT FORMAT: Plain markdown only. No HTML tags.
 
-EVERY element MUST have Bootstrap classes:
-<div class="mb-4">
-<h2 class="text-primary fw-bold mb-3">Section Title</h2>
-<h3 class="fw-bold text-secondary mb-2">Subsection</h3>
-<p class="mb-2">Paragraph text.</p>
-<ul class="list-unstyled ms-3">
-<li class="mb-2">Bullet with <strong>emphasis</strong></li>
-</ul>
-<div class="alert alert-warning"><strong>Important:</strong> This guidance inspires, not copies.</div>
-</div>
+> ⚠️ IMPORTANT: The inspiration samples below are provided to help you understand how to draw on your own experiences. Do NOT submit them as your own work. Use them only as a reference for tone, structure, and how to connect your profile to the prompt. Your essay must be written in your own voice.
 
 SECTIONS REQUIRED:
-1. <h2 class="text-primary fw-bold mb-3">Key Themes to Explore</h2> - What to highlight
-2. <h2 class="text-primary fw-bold mb-3">University Connection</h2> - Show fit
-3. <h2 class="text-primary fw-bold mb-3">Structure & Tone</h2> - How to approach
-4. <h2 class="text-primary fw-bold mb-3">Show, Don't Tell</h2> - Examples
-5. <h2 class="text-primary fw-bold mb-3">What to Avoid</h2> - Pitfalls
-
-OUTPUT: Valid HTML, ONLY Bootstrap classes, NO markdown, NO plain text, ONLY HTML`;
+## Key Themes to Explore
+## University Connection
+## Structure & Tone
+## Show, Don't Tell
+## What to Avoid`;
 
     const genAI = new GoogleGenerativeAI(apiKey);
     const model = genAI.getGenerativeModel({ model: modelName, generationConfig: { temperature: 0.8 } });
     const result = await model.generateContent(prompt);
-    const essayGuidance = enhanceHtmlWithBootstrap(result.response.text().trim());
+    const essayGuidance = result.response.text().trim();
 
     res.json({
       success: true,

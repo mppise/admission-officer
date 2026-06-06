@@ -1,6 +1,6 @@
 #!/usr/bin/env node
-import React, { useState } from 'react';
-import { render, Box, Text } from 'ink';
+import React, { useState, useEffect } from 'react';
+import { render, Box, Text, useInput, useApp } from 'ink';
 import { promises as fs } from 'fs';
 
 import { bootstrap, workspacePath, getApiKey, getModel, getTokenWindow, getContentBudgetPct, saveConfig, ConfigValidationError } from '../../config/bootstrap.js';
@@ -89,6 +89,67 @@ function showMenu(
       );
     }
     render(<MenuScreen />);
+  });
+}
+
+// ─── Markdown viewer screen ───────────────────────────────────────────────────
+// Renders markdown content as a scrollable tall textbox. Press any key to return.
+
+function showMarkdownScreen(content: string, subtitle: string, contextLine?: string): Promise<void> {
+  return new Promise(resolve => {
+    function MarkdownScreen() {
+      const { exit } = useApp();
+      const lines = content.split('\n');
+      const viewportHeight = Math.max(10, (process.stdout.rows ?? 24) - 10);
+      const [scrollTop, setScrollTop] = useState(0);
+      const maxScroll = Math.max(0, lines.length - viewportHeight);
+
+      useInput((_ch, key) => {
+        if (key.escape || key.return) { exit(); resolve(); return; }
+        if (key.upArrow)   setScrollTop(s => Math.max(0, s - 1));
+        if (key.downArrow) setScrollTop(s => Math.min(maxScroll, s + 1));
+        if (key.pageUp)    setScrollTop(s => Math.max(0, s - viewportHeight));
+        if (key.pageDown)  setScrollTop(s => Math.min(maxScroll, s + viewportHeight));
+      });
+
+      const visible = lines.slice(scrollTop, scrollTop + viewportHeight);
+      const cols = Math.min(process.stdout.columns ?? 80, 100);
+      const bar = '▓▒░' + '─'.repeat(Math.max(0, cols - 10)) + '░▒▓';
+
+      return (
+        <Box flexDirection="column" minHeight={process.stdout.rows ?? 24}>
+          <Box flexDirection="column" paddingX={3} paddingTop={1} paddingBottom={0}>
+            <Box>
+              <Text bold color="magenta">ao </Text>
+              <Text bold color="white">Admissions Officer  </Text>
+              <Text dimColor color="magenta">/ </Text>
+              <Text bold color="cyan"> {subtitle}</Text>
+            </Box>
+            <Box paddingTop={0}>
+              <Text color="magenta">{bar}</Text>
+            </Box>
+          </Box>
+          {contextLine && (
+            <Box paddingX={5} paddingTop={1} paddingBottom={0}>
+              <Text color="white" bold>  {contextLine}</Text>
+            </Box>
+          )}
+          <Box flexGrow={1} flexDirection="column" paddingX={5} paddingY={1} overflow="hidden">
+            {visible.map((line, i) => (
+              <Text key={i} wrap="wrap">{line || ' '}</Text>
+            ))}
+          </Box>
+          <Box paddingX={5} paddingBottom={1}>
+            <Text color="magenta">  [ ↑↓ / PgUp PgDn ] </Text>
+            <Text color="white"> scroll  </Text>
+            <Text color="magenta">[ ↵ / esc ] </Text>
+            <Text color="white"> back</Text>
+            <Text dimColor>  ({scrollTop + 1}–{Math.min(scrollTop + viewportHeight, lines.length)} of {lines.length} lines)</Text>
+          </Box>
+        </Box>
+      );
+    }
+    render(<MarkdownScreen />);
   });
 }
 
@@ -313,11 +374,10 @@ async function screenGuidanceList(nav: Nav, error?: string): Promise<Nav> {
     clearMessageLog('menu-return');
     return screenUniversityContext(nav);
   }
-  if (!getApiKey()) return screenUniversityContext(nav, 'Gemini API key not configured. Go to Config to set it.');
-
   try {
     let markdownPath: string;
     if (val === '__new') {
+      if (!getApiKey()) return screenUniversityContext(nav, 'Gemini API key not configured. Go to Config to set it.');
       const timestamp = makeTimestamp();
       // [C01-F11] Spinner while Gemini generates guidance report
       const result = await withSpinner(
@@ -331,7 +391,9 @@ async function screenGuidanceList(nav: Nav, error?: string): Promise<Nav> {
       const result = await showGuidance(nav.studentSlug!, nav.universitySlug!, val);
       markdownPath = result.markdownPath;
     }
-    return screenPdfPrompt(nav, markdownPath, 'guidance');
+    const content = await fs.readFile(markdownPath, 'utf8');
+    await showMarkdownScreen(content, 'Guidance', ctx(nav));
+    return screenGuidanceList(nav);
   } catch (err) {
     return screenUniversityContext(nav, err instanceof Error ? err.message : String(err));
   }
@@ -352,11 +414,10 @@ async function screenEssayList(nav: Nav, error?: string): Promise<Nav> {
     clearMessageLog('menu-return');
     return screenUniversityContext(nav);
   }
-  if (!getApiKey()) return screenUniversityContext(nav, 'Gemini API key not configured. Go to Config to set it.');
-
   try {
     let markdownPath: string;
     if (val === '__new') {
+      if (!getApiKey()) return screenUniversityContext(nav, 'Gemini API key not configured. Go to Config to set it.');
       const timestamp = makeTimestamp();
       // [C05-F01] Collect essay inputs interactively before starting the spinner
       const inputs: EssayInputs | null = await collectEssayInputs(nav.studentSlug!, nav.universitySlug!, timestamp);
@@ -373,14 +434,16 @@ async function screenEssayList(nav: Nav, error?: string): Promise<Nav> {
       const result = await showEssay(nav.studentSlug!, nav.universitySlug!, val);
       markdownPath = result.markdownPath;
     }
-    return screenPdfPrompt(nav, markdownPath, 'essay');
+    const content = await fs.readFile(markdownPath, 'utf8');
+    await showMarkdownScreen(content, 'Essay', ctx(nav));
+    return screenEssayList(nav);
   } catch (err) {
     return screenUniversityContext(nav, err instanceof Error ? err.message : String(err));
   }
 }
 
 // [C01-F08] PDF prompt — returnTo controls where Back/Esc lands
-async function screenPdfPrompt(nav: Nav, markdownPath: string, returnTo: 'student' | 'university' | 'guidance' | 'essay'): Promise<Nav> {
+async function screenPdfPrompt(nav: Nav, markdownPath: string, returnTo: 'student' | 'university'): Promise<Nav> {
   const items = [
     { label: 'Yes — Export to PDF', value: 'yes' },
     { label: 'No — Return to menu', value: 'no' },
@@ -411,8 +474,6 @@ async function screenPdfPrompt(nav: Nav, markdownPath: string, returnTo: 'studen
   // [C08] Clear messages on returning to a parent menu
   clearMessageLog('menu-return');
   if (returnTo === 'student') return screenStudentContext(nav);
-  if (returnTo === 'guidance') return screenGuidanceList(nav);
-  if (returnTo === 'essay') return screenEssayList(nav);
   return screenUniversityContext(nav);
 }
 

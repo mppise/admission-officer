@@ -3,6 +3,7 @@
 **Domain:** web_server
 **Author:** Mangesh Pise (reverse-engineered)
 **Date:** 2026-06-06
+**Last updated:** 2026-06-06
 **Status:** Complete (v1.0)
 
 ---
@@ -38,17 +39,34 @@ An Express web server that exposes the university scraping and AI generation pip
 ### F05 — Guidance generation
 - `POST /api/generate-guidance` body: `{ studentData, universityData }`
 - Uses an inline hardcoded Gemini prompt (not `c04-guidance-generate.prompt.md`)
-- Returns Bootstrap-styled HTML (not markdown)
-- `enhanceHtmlWithBootstrap()` adds Bootstrap classes to elements lacking them
+- Returns **plain markdown** (not HTML)
+- Prompt instructs model: `OUTPUT FORMAT: Plain markdown only. No HTML tags.`
+- Required sections: `## University Fit Summary`, `## Strengths to Highlight`, `## Key Themes`, `## University-Specific Tactics`
+- `enhanceHtmlWithBootstrap()` is no longer called for this endpoint
 
 ### F06 — Essay guidance generation
 - `POST /api/generate-essay-guidance` body: `{ studentData, universityData, essayPrompt, wordLimit? }`
 - Uses an inline hardcoded Gemini prompt (not `c05-essay-generate.prompt.md`)
-- Returns Bootstrap-styled HTML
+- Returns **plain markdown** (not HTML)
+- Prompt instructs model: `OUTPUT FORMAT: Plain markdown only. No HTML tags.`
+- Includes a warning blockquote: `> ⚠️ IMPORTANT: The inspiration samples below are provided to help you understand how to draw on your own experiences...`
+- Required sections: `## Key Themes to Explore`, `## University Connection`, `## Structure & Tone`, `## Show, Don't Tell`, `## What to Avoid`
+- `enhanceHtmlWithBootstrap()` is no longer called for this endpoint
 
 ### F07 — Shared scraper utility
 - `src/utils/universityScraper.ts` is imported by both C03 (CLI) and the web server
 - Provides `crawlUniversityWebsite()`, `extractUniversityInfo()`, `scrapeUniversity()` with `ProgressCallback`
+
+### F08 — Web UI markdown rendering
+- `web/public/app.js` renders guidance and essay guidance using `marked.parse()` + `DOMPurify.sanitize()`
+- `marked` loaded from CDN: `https://cdn.jsdelivr.net/npm/marked/marked.min.js`
+- `DOMPurify` loaded from CDN: `https://cdnjs.cloudflare.com/ajax/libs/dompurify/3.0.6/purify.min.js`
+- Essay guidance cards use `class="markdown-body"` container for rendered content
+
+### F09 — PDF export buttons removed
+- `btnExportGuidancePdf` and `btnExportAllEssaysPdf` DOM elements removed from `web/public/index.html`
+- Corresponding `exportGuidancePdf()` and `exportAllEssaysPdf()` functions and their event listeners removed from `app.js`
+- Student profile (`btnExportStudentPdf`) and university profile (`btnExportUniversityPdf`) PDF export buttons remain in the web UI
 
 ---
 
@@ -58,8 +76,8 @@ An Express web server that exposes the university scraping and AI generation pip
 GET  /api/health
 POST /api/scrape-university          { domain: string, intendedMajors?: string[] }
 POST /api/scrape-university-stream   { domain: string, intendedMajors?: string[] }   → SSE
-POST /api/generate-guidance          { studentData: object, universityData: object }
-POST /api/generate-essay-guidance    { studentData, universityData, essayPrompt, wordLimit? }
+POST /api/generate-guidance          { studentData: object, universityData: object }  → { guidance: string (markdown) }
+POST /api/generate-essay-guidance    { studentData, universityData, essayPrompt, wordLimit? }  → { guidance: string (markdown) }
 ```
 
 ### Web storage model (browser-side localStorage)
@@ -74,4 +92,4 @@ POST /api/generate-essay-guidance    { studentData, universityData, essayPrompt,
 
 The web server reads `GEMINI_API_KEY` and `GEMINI_MODEL` from the server's environment (not the user's workspace `.env`). CORS is open (`*`) on the SSE endpoint — acceptable for a localhost-only development tool. No student data is persisted server-side; all data lives in the browser's localStorage. The server does not write to `university-ao/` workspace.
 
-**Note:** Web server guidance/essay prompts diverge from CLI `.prompt.md` prompts. The web prompts produce Bootstrap HTML for browser rendering; the CLI prompts produce structured markdown. This is a known architectural divergence (see architecture-spec.md section 9).
+**Note:** Web server guidance/essay prompts now produce plain markdown (not Bootstrap HTML). The web UI renders markdown via `marked` + `DOMPurify`. This closes the prior architectural divergence noted in architecture-spec.md section 9 — both CLI and web now treat guidance/essay output as markdown.
