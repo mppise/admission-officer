@@ -155,6 +155,15 @@ const elements = {
   loadingText: document.getElementById('loadingText'),
   btnExportStudentPdf: document.getElementById('btnExportStudentPdf'),
   btnExportUniversityPdf: document.getElementById('btnExportUniversityPdf'),
+  btnGenerateGuidance: document.getElementById('btnGenerateGuidance'),
+  btnGenerateEssayGuidance: document.getElementById('btnGenerateEssayGuidance'),
+  essayPrompt: document.getElementById('essayPrompt'),
+  essayWordLimit: document.getElementById('essayWordLimit'),
+  guidanceContainer: document.getElementById('guidanceContainer'),
+  guidanceContent: document.getElementById('guidanceContent'),
+  essayGuidanceList: document.getElementById('essayGuidanceList'),
+  btnExportGuidancePdf: document.getElementById('btnExportGuidancePdf'),
+  btnExportAllEssaysPdf: document.getElementById('btnExportAllEssaysPdf'),
 };
 
 // ─── Initialization ───────────────────────────────────────────────────────────
@@ -230,6 +239,12 @@ function setupEventListeners() {
   // Export buttons
   elements.btnExportStudentPdf.addEventListener('click', exportStudentPdf);
   elements.btnExportUniversityPdf.addEventListener('click', exportUniversityPdf);
+
+  // Guidance buttons
+  elements.btnGenerateGuidance.addEventListener('click', generateGuidance);
+  elements.btnGenerateEssayGuidance.addEventListener('click', generateEssayGuidance);
+  elements.btnExportGuidancePdf.addEventListener('click', exportGuidancePdf);
+  elements.btnExportAllEssaysPdf.addEventListener('click', exportAllEssaysPdf);
 }
 
 function setupAutoSave(formId, saveCallback) {
@@ -649,33 +664,104 @@ async function scrapeUniversity() {
   const student = StorageManager.getStudent(currentStudentId);
   const intendedMajors = getMajorsListData();
 
-  showLoadingSpinner(true, 'Scraping university website...');
+  // Show progress tracking UI
+  const progressDiv = document.getElementById('scrapeProgress');
+  const progressBar = document.getElementById('progressBar');
+  const progressPercentage = document.getElementById('progressPercentage');
+  const progressStatus = document.getElementById('progressStatus');
+  const progressDetails = document.getElementById('progressDetails');
+
+  progressDiv.style.display = 'block';
+  progressBar.style.width = '0%';
+  progressPercentage.textContent = '0%';
+  progressStatus.textContent = 'Starting scrape...';
+  progressDetails.innerHTML = '';
+
+  // Disable the scrape button
+  elements.btnScrapeUniversity.disabled = true;
 
   try {
-    const response = await fetch('/api/scrape-university', {
+    const response = await fetch('/api/scrape-university-stream', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ domain, intendedMajors }),
     });
 
     if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error.message || 'Scraping failed');
+      throw new Error(`HTTP ${response.status}`);
     }
 
-    const universityData = await response.json();
-    const uniId = Date.now().toString();
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    let universityData = null;
 
-    StorageManager.saveUniversity(currentStudentId, uniId, universityData);
-    elements.universityDomain.value = '';
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
 
-    renderUniversitiesList();
-    selectUniversity(uniId);
+      const chunk = decoder.decode(value, { stream: true });
+      const lines = chunk.split('\n');
+
+      for (const line of lines) {
+        if (line.startsWith('data: ')) {
+          try {
+            const data = JSON.parse(line.slice(6));
+
+            if (data.type === 'complete') {
+              universityData = data.data;
+              progressBar.style.width = '100%';
+              progressPercentage.textContent = '100%';
+              progressStatus.textContent = '✓ Scraping complete!';
+            } else if (data.type === 'error') {
+              throw new Error(data.message);
+            } else {
+              // Progress update
+              const { stage, pagesProcessed, totalPages, currentPage, status } = data;
+
+              if (stage === 'crawling' && pagesProcessed !== undefined && totalPages !== undefined) {
+                const percentage = Math.round((pagesProcessed / totalPages) * 100);
+                progressBar.style.width = percentage + '%';
+                progressPercentage.textContent = percentage + '%';
+                progressStatus.textContent = `Crawling: ${pagesProcessed}/${totalPages} pages`;
+
+                if (currentPage) {
+                  const pageUrl = new URL(currentPage).pathname || currentPage;
+                  progressDetails.innerHTML = `<div>Loading: ${pageUrl}</div>`;
+                }
+              } else if (stage === 'extracting') {
+                progressBar.style.width = '100%';
+                progressPercentage.textContent = '100%';
+                progressStatus.textContent = `Extracting: ${status || 'Processing...'}`;
+                progressDetails.innerHTML = `<div>${status || 'Analyzing scraped content...'}</div>`;
+              }
+            }
+          } catch (e) {
+            console.error('Error parsing progress data:', e, line);
+          }
+        }
+      }
+    }
+
+    if (universityData) {
+      const uniId = Date.now().toString();
+      StorageManager.saveUniversity(currentStudentId, uniId, universityData);
+      elements.universityDomain.value = '';
+
+      // Hide progress after a short delay
+      setTimeout(() => {
+        progressDiv.style.display = 'none';
+        renderUniversitiesList();
+        selectUniversity(uniId);
+      }, 1000);
+    } else {
+      throw new Error('No data received from scraper');
+    }
   } catch (error) {
     alert('Error scraping university: ' + error.message);
     console.error(error);
+    progressDiv.style.display = 'none';
   } finally {
-    showLoadingSpinner(false);
+    elements.btnScrapeUniversity.disabled = false;
   }
 }
 
@@ -691,12 +777,15 @@ function renderUniversitiesList() {
 
   container.innerHTML = universities.map(uniId => {
     const uni = StorageManager.getUniversity(currentStudentId, uniId);
-    const isActive = uniId === currentUniversityId;
+    const isExpanded = uniId === currentUniversityId;
     return `
-      <div class="list-group-item ${isActive ? 'active' : ''}" style="padding: 0.75rem; cursor: pointer; border: 1px solid #e5e7eb; border-radius: 6px; margin-bottom: 0.5rem;"
-           onclick="selectUniversity('${uniId}')">
-        <strong>${uni.universityName || 'Unnamed University'}</strong>
-        <small class="text-muted d-block">${uni.tagline || 'No tagline'}</small>
+      <div class="list-group-item" style="padding: 0.75rem; cursor: pointer; border: 1px solid #e5e7eb; border-radius: 6px; margin-bottom: 0.5rem; display: flex; justify-content: space-between; align-items: center; background: ${isExpanded ? '#eff6ff' : '#fff'}; border-left: 4px solid ${isExpanded ? '#4f46e5' : 'transparent'}; transition: all 0.2s;"
+           onclick="toggleUniversity('${uniId}')">
+        <div style="flex: 1;">
+          <strong>${uni.universityName || 'Unnamed University'}</strong>
+          <small class="text-muted d-block">${uni.tagline || 'No tagline'}</small>
+        </div>
+        <i class="fas fa-chevron-${isExpanded ? 'down' : 'right'}" style="margin-left: 1rem; color: #9ca3af; font-size: 1.2rem;"></i>
       </div>
     `;
   }).join('');
@@ -706,10 +795,23 @@ function renderUniversitiesList() {
   }
 }
 
+function toggleUniversity(uniId) {
+  // If clicking the same university, collapse it; otherwise expand it
+  if (currentUniversityId === uniId) {
+    currentUniversityId = null;
+    elements.universityFormContainer.style.display = 'none';
+  } else {
+    selectUniversity(uniId);
+  }
+}
+
 function selectUniversity(uniId) {
   currentUniversityId = uniId;
   renderUniversitiesList();
   loadUniversityForm();
+  // Enable guidance buttons when university is selected
+  elements.btnGenerateGuidance.disabled = false;
+  elements.btnGenerateEssayGuidance.disabled = false;
 }
 
 function loadUniversityForm() {
@@ -931,17 +1033,44 @@ function exportStudentPdf() {
   let yOffset = 20;
 
   // Title
-  doc.setFontSize(20);
+  doc.setFontSize(24);
+  doc.setTextColor(79, 70, 229);
   doc.text('Student Profile', 20, yOffset);
-  yOffset += 15;
+  yOffset += 12;
 
-  doc.setFontSize(12);
+  // Subtitle with date
+  doc.setFontSize(10);
+  doc.setTextColor(100);
+  doc.text(`Generated: ${new Date().toLocaleDateString()}`, 20, yOffset);
+  yOffset += 12;
+
+  // Divider line
+  doc.setDrawColor(230, 230, 230);
+  doc.line(20, yOffset - 2, 190, yOffset - 2);
+  yOffset += 8;
+
+  doc.setFontSize(11);
   doc.setTextColor(80);
 
+  // Helper function to add section
+  const addSection = (title) => {
+    if (yOffset > 270) {
+      doc.addPage();
+      yOffset = 20;
+    }
+    doc.setFontSize(13);
+    doc.setTextColor(79, 70, 229);
+    doc.text(title, 20, yOffset);
+    yOffset += 8;
+    doc.setDrawColor(230, 230, 230);
+    doc.line(20, yOffset - 2, 190, yOffset - 2);
+    yOffset += 6;
+    doc.setFontSize(10);
+    doc.setTextColor(0);
+  };
+
   // Personal Information
-  doc.text('PERSONAL INFORMATION', 20, yOffset);
-  yOffset += 8;
-  doc.setFontSize(10);
+  addSection('PERSONAL INFORMATION');
   const personalInfo = [
     `Name: ${student.name}`,
     `Graduation Year: ${student.gradYear || '—'}`,
@@ -949,51 +1078,39 @@ function exportStudentPdf() {
     `Intended Majors: ${(student.intendedMajors || []).join(', ') || '—'}`,
   ];
   personalInfo.forEach(line => {
-    doc.text(line, 20, yOffset);
+    doc.text(line, 25, yOffset);
     yOffset += 6;
   });
   yOffset += 5;
 
   // Academic Information
-  doc.setFontSize(12);
-  doc.setTextColor(80);
-  doc.text('ACADEMIC INFORMATION', 20, yOffset);
-  yOffset += 8;
-  doc.setFontSize(10);
+  addSection('ACADEMIC INFORMATION');
   const academicInfo = [
     `Weighted GPA: ${student.gpaWeighted || '—'}`,
     `Unweighted GPA: ${student.gpaUnweighted || '—'}`,
     `Class Rank: ${student.classRank || '—'}`,
   ];
   academicInfo.forEach(line => {
-    doc.text(line, 20, yOffset);
+    doc.text(line, 25, yOffset);
     yOffset += 6;
   });
   yOffset += 5;
 
   // Test Scores
-  doc.setFontSize(12);
-  doc.setTextColor(80);
-  doc.text('STANDARDIZED TESTS', 20, yOffset);
-  yOffset += 8;
-  doc.setFontSize(10);
+  addSection('STANDARDIZED TESTS');
   const testInfo = [
     `SAT Total: ${student.sat?.total || '—'} (Math: ${student.sat?.math || '—'}, Reading: ${student.sat?.reading || '—'})`,
     `ACT Composite: ${student.act?.composite || '—'}`,
   ];
   testInfo.forEach(line => {
-    doc.text(line, 20, yOffset);
+    doc.text(line, 25, yOffset);
     yOffset += 6;
   });
 
   // AP Scores
   if (student.apScores && student.apScores.length > 0) {
     yOffset += 5;
-    doc.setFontSize(11);
-    doc.setTextColor(80);
-    doc.text('AP Scores', 20, yOffset);
-    yOffset += 6;
-    doc.setFontSize(10);
+    addSection('AP SCORES');
     student.apScores.forEach(score => {
       doc.text(`${score.subject}: ${score.score}`, 25, yOffset);
       yOffset += 5;
@@ -1003,18 +1120,133 @@ function exportStudentPdf() {
   // Extracurriculars
   if (student.extracurriculars && student.extracurriculars.length > 0) {
     yOffset += 5;
-    doc.setFontSize(12);
-    doc.setTextColor(80);
-    doc.text('EXTRACURRICULAR ACTIVITIES', 20, yOffset);
-    yOffset += 8;
-    doc.setFontSize(10);
+    addSection('EXTRACURRICULAR ACTIVITIES');
     student.extracurriculars.forEach(activity => {
-      doc.text(`${activity.activityName}`, 20, yOffset);
-      yOffset += 4;
+      if (yOffset > 270) {
+        doc.addPage();
+        yOffset = 20;
+      }
+      doc.setFontSize(10);
+      doc.setTextColor(0);
+      doc.setFont(undefined, 'bold');
+      doc.text(`${activity.activityName}`, 25, yOffset);
+      yOffset += 5;
+      doc.setFont(undefined, 'normal');
       if (activity.description) {
-        const lines = doc.splitTextToSize(activity.description, 150);
+        const lines = doc.splitTextToSize(activity.description, 145);
         lines.forEach(line => {
-          doc.text(line, 25, yOffset);
+          doc.text(line, 30, yOffset);
+          yOffset += 4;
+        });
+      }
+      yOffset += 2;
+    });
+  }
+
+  // About/Personal Statement
+  if (student.about) {
+    yOffset += 5;
+    addSection('ABOUT');
+    const aboutLines = doc.splitTextToSize(student.about, 165);
+    aboutLines.forEach(line => {
+      if (yOffset > 270) {
+        doc.addPage();
+        yOffset = 20;
+      }
+      doc.text(line, 25, yOffset);
+      yOffset += 5;
+    });
+  }
+
+  // Awards & Honors
+  if (student.awards && student.awards.length > 0) {
+    yOffset += 5;
+    addSection('AWARDS & HONORS');
+    student.awards.forEach(award => {
+      if (yOffset > 270) {
+        doc.addPage();
+        yOffset = 20;
+      }
+      doc.setFont(undefined, 'bold');
+      doc.text(`${award.awardName}`, 25, yOffset);
+      yOffset += 5;
+      doc.setFont(undefined, 'normal');
+      if (award.description) {
+        const lines = doc.splitTextToSize(award.description, 145);
+        lines.forEach(line => {
+          doc.text(line, 30, yOffset);
+          yOffset += 4;
+        });
+      }
+      yOffset += 2;
+    });
+  }
+
+  // Essays
+  if (student.essays && student.essays.length > 0) {
+    yOffset += 5;
+    addSection('ESSAYS');
+    student.essays.forEach(essay => {
+      if (yOffset > 270) {
+        doc.addPage();
+        yOffset = 20;
+      }
+      doc.setFont(undefined, 'bold');
+      doc.text(`${essay.essayType}`, 25, yOffset);
+      yOffset += 5;
+      doc.setFont(undefined, 'normal');
+      if (essay.essayContent) {
+        const lines = doc.splitTextToSize(essay.essayContent, 145);
+        lines.forEach(line => {
+          doc.text(line, 30, yOffset);
+          yOffset += 4;
+        });
+      }
+      yOffset += 2;
+    });
+  }
+
+  // Volunteer Work
+  if (student.volunteering && student.volunteering.length > 0) {
+    yOffset += 5;
+    addSection('VOLUNTEER WORK');
+    student.volunteering.forEach(volunteer => {
+      if (yOffset > 270) {
+        doc.addPage();
+        yOffset = 20;
+      }
+      doc.setFont(undefined, 'bold');
+      doc.text(`${volunteer.organizationName}`, 25, yOffset);
+      yOffset += 5;
+      doc.setFont(undefined, 'normal');
+      if (volunteer.description) {
+        const lines = doc.splitTextToSize(volunteer.description, 145);
+        lines.forEach(line => {
+          doc.text(line, 30, yOffset);
+          yOffset += 4;
+        });
+      }
+      yOffset += 2;
+    });
+  }
+
+  // Work Experience
+  if (student.workExperience && student.workExperience.length > 0) {
+    yOffset += 5;
+    addSection('WORK EXPERIENCE');
+    student.workExperience.forEach(work => {
+      if (yOffset > 270) {
+        doc.addPage();
+        yOffset = 20;
+      }
+      doc.setFont(undefined, 'bold');
+      doc.text(`${work.position}`, 25, yOffset);
+      yOffset += 5;
+      doc.setFont(undefined, 'normal');
+      if (work.description) {
+        const lines = doc.splitTextToSize(work.description, 145);
+        lines.forEach(line => {
+          doc.text(line, 30, yOffset);
           yOffset += 4;
         });
       }
@@ -1037,27 +1269,57 @@ function exportUniversityPdf() {
   let yOffset = 20;
 
   // Title
-  doc.setFontSize(20);
+  doc.setFontSize(24);
+  doc.setTextColor(79, 70, 229);
   doc.text(uni.universityName, 20, yOffset);
   yOffset += 12;
 
-  doc.setFontSize(10);
-  doc.setTextColor(100);
+  // Tagline
   if (uni.tagline) {
-    doc.text(uni.tagline, 20, yOffset);
-    yOffset += 8;
+    doc.setFontSize(11);
+    doc.setTextColor(100);
+    doc.setFont(undefined, 'italic');
+    const taglineLines = doc.splitTextToSize(uni.tagline, 170);
+    taglineLines.forEach(line => {
+      doc.text(line, 20, yOffset);
+      yOffset += 5;
+    });
+    doc.setFont(undefined, 'normal');
+    yOffset += 5;
   }
+
+  // Divider line
+  doc.setDrawColor(230, 230, 230);
+  doc.line(20, yOffset, 190, yOffset);
+  yOffset += 8;
+
+  // Helper function to add section
+  const addUniSection = (title) => {
+    if (yOffset > 270) {
+      doc.addPage();
+      yOffset = 20;
+    }
+    doc.setFontSize(13);
+    doc.setTextColor(79, 70, 229);
+    doc.text(title, 20, yOffset);
+    yOffset += 8;
+    doc.setDrawColor(230, 230, 230);
+    doc.line(20, yOffset - 2, 190, yOffset - 2);
+    yOffset += 6;
+    doc.setFontSize(10);
+    doc.setTextColor(0);
+  };
 
   // Mission
   if (uni.mission) {
-    doc.setFontSize(12);
-    doc.setTextColor(80);
-    doc.text('MISSION', 20, yOffset);
-    yOffset += 6;
-    doc.setFontSize(10);
-    const missionLines = doc.splitTextToSize(uni.mission, 170);
+    addUniSection('MISSION');
+    const missionLines = doc.splitTextToSize(uni.mission, 165);
     missionLines.forEach(line => {
-      doc.text(line, 20, yOffset);
+      if (yOffset > 270) {
+        doc.addPage();
+        yOffset = 20;
+      }
+      doc.text(line, 25, yOffset);
       yOffset += 5;
     });
     yOffset += 3;
@@ -1065,14 +1327,14 @@ function exportUniversityPdf() {
 
   // Culture
   if (uni.culture) {
-    doc.setFontSize(12);
-    doc.setTextColor(80);
-    doc.text('CULTURE', 20, yOffset);
-    yOffset += 6;
-    doc.setFontSize(10);
-    const cultureLines = doc.splitTextToSize(uni.culture, 170);
+    addUniSection('CULTURE');
+    const cultureLines = doc.splitTextToSize(uni.culture, 165);
     cultureLines.forEach(line => {
-      doc.text(line, 20, yOffset);
+      if (yOffset > 270) {
+        doc.addPage();
+        yOffset = 20;
+      }
+      doc.text(line, 25, yOffset);
       yOffset += 5;
     });
     yOffset += 3;
@@ -1080,12 +1342,12 @@ function exportUniversityPdf() {
 
   // Core Values
   if (uni.coreValues && uni.coreValues.length > 0) {
-    doc.setFontSize(12);
-    doc.setTextColor(80);
-    doc.text('CORE VALUES', 20, yOffset);
-    yOffset += 6;
-    doc.setFontSize(10);
+    addUniSection('CORE VALUES');
     uni.coreValues.forEach(value => {
+      if (yOffset > 275) {
+        doc.addPage();
+        yOffset = 20;
+      }
       doc.text(`• ${value}`, 25, yOffset);
       yOffset += 5;
     });
@@ -1094,18 +1356,410 @@ function exportUniversityPdf() {
 
   // Academic Specialties
   if (uni.academicSpecialties && uni.academicSpecialties.length > 0) {
-    doc.setFontSize(12);
-    doc.setTextColor(80);
-    doc.text('ACADEMIC STRENGTHS', 20, yOffset);
-    yOffset += 6;
-    doc.setFontSize(10);
+    addUniSection('ACADEMIC STRENGTHS');
     uni.academicSpecialties.forEach(spec => {
+      if (yOffset > 275) {
+        doc.addPage();
+        yOffset = 20;
+      }
       doc.text(`• ${spec}`, 25, yOffset);
       yOffset += 5;
+    });
+    yOffset += 3;
+  }
+
+  // Notable Programs
+  if (uni.notablePrograms && uni.notablePrograms.length > 0) {
+    addUniSection('NOTABLE PROGRAMS');
+    uni.notablePrograms.forEach(prog => {
+      if (yOffset > 275) {
+        doc.addPage();
+        yOffset = 20;
+      }
+      doc.text(`• ${prog}`, 25, yOffset);
+      yOffset += 5;
+    });
+    yOffset += 3;
+  }
+
+  // Campus Ethos
+  if (uni.campusEthos) {
+    addUniSection('CAMPUS ETHOS');
+    const ethosLines = doc.splitTextToSize(uni.campusEthos, 165);
+    ethosLines.forEach(line => {
+      if (yOffset > 270) {
+        doc.addPage();
+        yOffset = 20;
+      }
+      doc.text(line, 25, yOffset);
+      yOffset += 5;
+    });
+    yOffset += 3;
+  }
+
+  // Ideal Candidate Traits
+  if (uni.idealCandidateTraits && uni.idealCandidateTraits.length > 0) {
+    addUniSection('IDEAL CANDIDATE TRAITS');
+    uni.idealCandidateTraits.forEach(trait => {
+      if (yOffset > 275) {
+        doc.addPage();
+        yOffset = 20;
+      }
+      doc.text(`• ${trait}`, 25, yOffset);
+      yOffset += 5;
+    });
+    yOffset += 3;
+  }
+
+  // Major-Specific Notes
+  if (uni.majorSpecificNotes && Object.keys(uni.majorSpecificNotes).length > 0) {
+    addUniSection('MAJOR-SPECIFIC NOTES');
+    Object.entries(uni.majorSpecificNotes).forEach(([major, notes]) => {
+      if (notes && yOffset > 270) {
+        doc.addPage();
+        yOffset = 20;
+      }
+      if (notes) {
+        doc.setFont(undefined, 'bold');
+        doc.text(`${major}:`, 25, yOffset);
+        yOffset += 5;
+        doc.setFont(undefined, 'normal');
+        const lines = doc.splitTextToSize(notes, 160);
+        lines.forEach(line => {
+          if (yOffset > 275) {
+            doc.addPage();
+            yOffset = 20;
+          }
+          doc.text(line, 30, yOffset);
+          yOffset += 4;
+        });
+        yOffset += 2;
+      }
     });
   }
 
   doc.save(`${uni.universityName}_profile.pdf`);
+}
+
+// ─── Guidance Functions ───────────────────────────────────────────────────────
+
+async function generateGuidance() {
+  if (!currentStudentId || !currentUniversityId) {
+    alert('Please select a student and university first');
+    return;
+  }
+
+  const student = StorageManager.getStudent(currentStudentId);
+  const uni = StorageManager.getUniversity(currentStudentId, currentUniversityId);
+
+  showLoadingSpinner(true, 'Generating guidance...');
+  elements.btnGenerateGuidance.disabled = true;
+
+  try {
+    const response = await fetch('/api/generate-guidance', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ studentData: student, universityData: uni }),
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.message || 'Failed to generate guidance');
+    }
+
+    const result = await response.json();
+    elements.guidanceContent.innerHTML = result.guidance;
+    elements.guidanceContainer.style.display = 'block';
+    elements.btnExportGuidancePdf.disabled = false;
+  } catch (error) {
+    alert('Error generating guidance: ' + error.message);
+    console.error(error);
+  } finally {
+    showLoadingSpinner(false);
+    elements.btnGenerateGuidance.disabled = false;
+  }
+}
+
+async function generateEssayGuidance() {
+  if (!currentStudentId || !currentUniversityId) {
+    alert('Please select a student and university first');
+    return;
+  }
+
+  const essayPrompt = elements.essayPrompt.value.trim();
+  if (!essayPrompt) {
+    alert('Please enter an essay prompt');
+    return;
+  }
+
+  const student = StorageManager.getStudent(currentStudentId);
+  const uni = StorageManager.getUniversity(currentStudentId, currentUniversityId);
+  const wordLimit = elements.essayWordLimit.value.trim();
+
+  showLoadingSpinner(true, 'Generating essay guidance...');
+  elements.btnGenerateEssayGuidance.disabled = true;
+
+  try {
+    const response = await fetch('/api/generate-essay-guidance', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        studentData: student,
+        universityData: uni,
+        essayPrompt,
+        wordLimit: wordLimit || null,
+      }),
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.message || 'Failed to generate essay guidance');
+    }
+
+    const result = await response.json();
+
+    // Add essay guidance to list
+    const essayId = Date.now();
+    const essayItem = document.createElement('div');
+    essayItem.className = 'card mb-3 border-info';
+    essayItem.innerHTML = `
+      <div class="card-header bg-light">
+        <div class="d-flex justify-content-between align-items-center">
+          <h6 class="mb-0">Essay Guidance</h6>
+          <button class="btn btn-sm btn-outline-danger" onclick="this.closest('.card').remove(); updateEssayExportButton();">
+            <i class="fas fa-trash"></i>
+          </button>
+        </div>
+      </div>
+      <div class="card-body">
+        <p class="text-muted small mb-3"><strong>Prompt:</strong> ${essayPrompt.substring(0, 100)}...</p>
+        <div style="background: #f9fafb; padding: 1.5rem; border-radius: 6px; font-size: 0.95rem; line-height: 1.8; max-height: 500px; overflow-y: auto;">
+          ${result.guidance}
+        </div>
+      </div>
+    `;
+
+    // Style the HTML content within the essay guidance
+    const essayContent = essayItem.querySelector('div[style*="background: #f9fafb"]');
+    if (essayContent) {
+      essayContent.querySelectorAll('h2, h3').forEach(h => {
+        h.style.marginTop = '1.5rem';
+        h.style.marginBottom = '0.75rem';
+        h.style.color = '#1f2937';
+        h.style.fontWeight = '600';
+      });
+      essayContent.querySelectorAll('p').forEach(p => {
+        p.style.marginBottom = '0.75rem';
+      });
+      essayContent.querySelectorAll('ul').forEach(ul => {
+        ul.style.marginLeft = '1.25rem';
+        ul.style.marginBottom = '0.75rem';
+      });
+      essayContent.querySelectorAll('li').forEach(li => {
+        li.style.marginBottom = '0.5rem';
+      });
+    }
+
+    elements.essayGuidanceList.insertBefore(essayItem, elements.essayGuidanceList.firstChild);
+    elements.essayPrompt.value = '';
+    elements.essayWordLimit.value = '';
+    // Enable export button when essays exist
+    if (elements.essayGuidanceList.children.length > 0) {
+      elements.btnExportAllEssaysPdf.disabled = false;
+    }
+  } catch (error) {
+    alert('Error generating essay guidance: ' + error.message);
+    console.error(error);
+  } finally {
+    showLoadingSpinner(false);
+    elements.btnGenerateEssayGuidance.disabled = false;
+  }
+}
+
+function updateEssayExportButton() {
+  if (elements.essayGuidanceList.children.length === 0) {
+    elements.btnExportAllEssaysPdf.disabled = true;
+  } else {
+    elements.btnExportAllEssaysPdf.disabled = false;
+  }
+}
+
+function exportGuidancePdf() {
+  if (!currentStudentId || !currentUniversityId) {
+    alert('Please select a student and university first');
+    return;
+  }
+
+  const student = StorageManager.getStudent(currentStudentId);
+  const uni = StorageManager.getUniversity(currentStudentId, currentUniversityId);
+
+  if (!elements.guidanceContent.innerHTML) {
+    alert('No guidance generated yet');
+    return;
+  }
+
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF();
+
+  // Bootstrap CSS for PDF rendering
+  const bootstrapStyles = `
+    <style>
+      * { margin: 0; padding: 0; }
+      body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; font-size: 11px; line-height: 1.5; color: #000; }
+      .container { max-width: 750px; margin: 0 auto; padding: 20px; }
+      h1, h2, h3, h4, h5, h6 { margin: 20px 0 10px 0; font-weight: 600; line-height: 1.3; }
+      h1 { font-size: 24px; }
+      h2 { font-size: 18px; color: #4f46e5; }
+      h3 { font-size: 14px; color: #1f2937; }
+      p { margin: 10px 0; }
+      ul, ol { margin: 10px 0 10px 20px; }
+      li { margin: 5px 0; }
+      .mb-2 { margin-bottom: 8px; }
+      .mb-3 { margin-bottom: 12px; }
+      .mb-4 { margin-bottom: 16px; }
+      .alert { padding: 12px; margin: 10px 0; border-radius: 4px; }
+      .alert-info { background-color: #e0f2fe; border-left: 4px solid #0284c7; color: #075985; }
+      .alert-warning { background-color: #fef3c7; border-left: 4px solid #f59e0b; color: #92400e; }
+      .text-primary { color: #4f46e5; }
+      .text-secondary { color: #6b7280; }
+      .fw-bold { font-weight: 600; }
+      .blockquote { margin: 10px 0; padding-left: 16px; border-left: 4px solid #4f46e5; color: #6b7280; font-style: italic; }
+      .list-unstyled { list-style: none; margin: 0; padding: 0; }
+      .ps-3 { padding-left: 12px; }
+      strong { font-weight: 600; }
+    </style>
+  `;
+
+  const htmlContent = `
+    <!DOCTYPE html>
+    <html>
+    <head>
+      ${bootstrapStyles}
+    </head>
+    <body>
+      <div class="container">
+        <h1 style="color: #4f46e5; margin-bottom: 20px;">Admissions Guidance Report</h1>
+        <p><strong>Student:</strong> ${student.name}</p>
+        <p><strong>University:</strong> ${uni.universityName}</p>
+        <p><strong>Generated:</strong> ${new Date().toLocaleDateString()}</p>
+        <hr style="margin: 20px 0; border: none; border-top: 1px solid #e5e7eb;">
+        ${elements.guidanceContent.innerHTML}
+      </div>
+    </body>
+    </html>
+  `;
+
+  doc.html(htmlContent, {
+    margin: [10, 10, 10, 10],
+    compress: true,
+    useCORS: true,
+    allowTaint: true,
+    onclone: (clonedDocument) => {
+      const styles = clonedDocument.createElement('style');
+      styles.innerHTML = `
+        h2 { color: #4f46e5 !important; }
+        h3 { color: #1f2937 !important; }
+      `;
+      clonedDocument.head.appendChild(styles);
+    },
+    callback: (pdf) => {
+      pdf.save(`${uni.universityName}_guidance.pdf`);
+    }
+  });
+}
+
+function exportAllEssaysPdf() {
+  if (!currentStudentId || !currentUniversityId) {
+    alert('Please select a student and university first');
+    return;
+  }
+
+  const student = StorageManager.getStudent(currentStudentId);
+  const uni = StorageManager.getUniversity(currentStudentId, currentUniversityId);
+  const essayItems = elements.essayGuidanceList.querySelectorAll('.card');
+
+  if (essayItems.length === 0) {
+    alert('No essays to export');
+    return;
+  }
+
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF();
+
+  // Bootstrap CSS for PDF rendering
+  const bootstrapStyles = `
+    <style>
+      * { margin: 0; padding: 0; }
+      body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; font-size: 11px; line-height: 1.5; color: #000; }
+      .container { max-width: 750px; margin: 0 auto; padding: 20px; }
+      h1, h2, h3, h4, h5, h6 { margin: 20px 0 10px 0; font-weight: 600; line-height: 1.3; }
+      h1 { font-size: 24px; }
+      h2 { font-size: 18px; color: #4f46e5; }
+      h3 { font-size: 14px; color: #1f2937; }
+      .essay-section { margin: 20px 0; padding: 15px; background-color: #f9fafb; border-radius: 4px; }
+      .essay-prompt { font-style: italic; color: #6b7280; margin: 10px 0; }
+      .essay-guidance { margin-top: 15px; }
+      p { margin: 10px 0; }
+      ul, ol { margin: 10px 0 10px 20px; }
+      li { margin: 5px 0; }
+      .mb-2 { margin-bottom: 8px; }
+      .mb-3 { margin-bottom: 12px; }
+      .mb-4 { margin-bottom: 16px; }
+      .alert { padding: 12px; margin: 10px 0; border-radius: 4px; }
+      .alert-info { background-color: #e0f2fe; border-left: 4px solid #0284c7; color: #075985; }
+      .alert-warning { background-color: #fef3c7; border-left: 4px solid #f59e0b; color: #92400e; }
+      .text-primary { color: #4f46e5; }
+      .text-secondary { color: #6b7280; }
+      .fw-bold { font-weight: 600; }
+      .blockquote { margin: 10px 0; padding-left: 16px; border-left: 4px solid #4f46e5; color: #6b7280; font-style: italic; }
+      .list-unstyled { list-style: none; margin: 0; padding: 0; }
+      .ps-3 { padding-left: 12px; }
+      strong { font-weight: 600; }
+      hr { margin: 20px 0; border: none; border-top: 1px solid #e5e7eb; }
+    </style>
+  `;
+
+  const essaysHtml = Array.from(essayItems).map((item, index) => {
+    const promptText = item.querySelector('.text-muted.small')?.textContent || '';
+    const guidanceHtml = item.querySelector('[style*="background"]')?.innerHTML || '';
+    return `
+      <div class="essay-section">
+        <h2>Essay ${index + 1}</h2>
+        <div class="essay-prompt"><strong>Prompt:</strong> ${promptText}</div>
+        <div class="essay-guidance">${guidanceHtml}</div>
+      </div>
+      <hr>
+    `;
+  }).join('');
+
+  const htmlContent = `
+    <!DOCTYPE html>
+    <html>
+    <head>
+      ${bootstrapStyles}
+    </head>
+    <body>
+      <div class="container">
+        <h1 style="color: #4f46e5; margin-bottom: 20px;">Essay Guidance Collection</h1>
+        <p><strong>Student:</strong> ${student.name}</p>
+        <p><strong>University:</strong> ${uni.universityName}</p>
+        <p><strong>Generated:</strong> ${new Date().toLocaleDateString()}</p>
+        <hr>
+        ${essaysHtml}
+      </div>
+    </body>
+    </html>
+  `;
+
+  doc.html(htmlContent, {
+    margin: [10, 10, 10, 10],
+    compress: true,
+    useCORS: true,
+    allowTaint: true,
+    callback: (pdf) => {
+      pdf.save(`${uni.universityName}_essays.pdf`);
+    }
+  });
 }
 
 // ─── Utility Functions ────────────────────────────────────────────────────────
