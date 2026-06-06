@@ -74,6 +74,15 @@ backlog:
     status: "complete"
     deployment_status: "complete"
 
+  - id: FEATURE-008
+    title: "Web Forms & Browser Interface"
+    domain: "infrastructure"
+    size: "l"
+    assignee: null
+    dependencies: []
+    status: "backlog"
+    deployment_status: null
+
 releases:
   - version: "v4.0.0"
     features: [FEATURE-001, FEATURE-002, FEATURE-003, FEATURE-004, FEATURE-005, FEATURE-006, FEATURE-007]

@@ -1,0 +1,610 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Admission Officer - College Guidance</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+  <style>
+    :root {
+      --primary: #4f46e5;
+      --primary-dark: #4338ca;
+      --success: #10b981;
+      --danger: #ef4444;
+      --warning: #f59e0b;
+      --info: #0ea5e9;
+    }
+
+    body {
+      background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+      min-height: 100vh;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    }
+
+    .navbar {
+      background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    }
+
+    .navbar-brand {
+      font-weight: 600;
+      font-size: 1.5rem;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    .container-main {
+      margin-top: 2rem;
+      margin-bottom: 2rem;
+    }
+
+    .card {
+      border: none;
+      border-radius: 12px;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+      transition: transform 0.2s, box-shadow 0.2s;
+    }
+
+    .card:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 8px 16px rgba(0, 0, 0, 0.12);
+    }
+
+    .btn-primary {
+      background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);
+      border: none;
+      padding: 0.6rem 1.5rem;
+      font-weight: 500;
+    }
+
+    .btn-primary:hover {
+      background: linear-gradient(135deg, var(--primary-dark) 0%, #3730a3 100%);
+    }
+
+    .form-label {
+      font-weight: 500;
+      color: #374151;
+      margin-bottom: 0.5rem;
+    }
+
+    .form-control, .form-select {
+      border-radius: 8px;
+      border: 1px solid #e5e7eb;
+      padding: 0.75rem;
+    }
+
+    .form-control:focus, .form-select:focus {
+      border-color: var(--primary);
+      box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.1);
+    }
+
+    .badge-section {
+      display: inline-block;
+      background: #f3f4f6;
+      padding: 0.25rem 0.75rem;
+      border-radius: 6px;
+      font-size: 0.875rem;
+      font-weight: 500;
+      margin-right: 0.5rem;
+      margin-bottom: 0.5rem;
+    }
+
+    .student-list-item {
+      cursor: pointer;
+      border-left: 4px solid transparent;
+      transition: all 0.2s;
+    }
+
+    .student-list-item:hover {
+      background: #f9fafb;
+      border-left-color: var(--primary);
+    }
+
+    .student-list-item.active {
+      background: #eff6ff;
+      border-left-color: var(--primary);
+    }
+
+    .section-header {
+      border-bottom: 2px solid #e5e7eb;
+      padding-bottom: 1rem;
+      margin-bottom: 1.5rem;
+    }
+
+    .section-header h5 {
+      color: var(--primary);
+      font-weight: 600;
+    }
+
+    .array-item {
+      background: #f9fafb;
+      border: 1px solid #e5e7eb;
+      border-radius: 8px;
+      padding: 1rem;
+      margin-bottom: 0.75rem;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .array-item-content {
+      flex: 1;
+    }
+
+    .array-item-btn {
+      margin-left: 0.5rem;
+    }
+
+    .status-indicator {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      padding: 0.25rem 0.75rem;
+      background: #f0fdf4;
+      color: #15803d;
+      border-radius: 6px;
+      font-size: 0.875rem;
+      font-weight: 500;
+    }
+
+    .status-indicator.pending {
+      background: #fef3c7;
+      color: #b45309;
+    }
+
+    .tab-content .form-section {
+      display: none;
+    }
+
+    .tab-content .form-section.active {
+      display: block;
+    }
+
+    .modal-backdrop {
+      background-color: rgba(0, 0, 0, 0.5);
+    }
+
+    .modal-content {
+      border: none;
+      border-radius: 12px;
+      box-shadow: 0 20px 25px rgba(0, 0, 0, 0.15);
+    }
+
+    .btn-close:focus {
+      box-shadow: 0 0 0 0.25rem rgba(79, 70, 229, 0.25);
+    }
+
+    .alert {
+      border: none;
+      border-radius: 8px;
+    }
+
+    .loading-spinner {
+      display: none;
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(0, 0, 0, 0.5);
+      z-index: 9999;
+      justify-content: center;
+      align-items: center;
+    }
+
+    .loading-spinner.active {
+      display: flex;
+    }
+
+    .spinner-content {
+      background: white;
+      padding: 2rem;
+      border-radius: 12px;
+      text-align: center;
+    }
+
+    .spinner-content p {
+      margin-top: 1rem;
+      color: #6b7280;
+      font-weight: 500;
+    }
+  </style>
+</head>
+<body>
+  <nav class="navbar navbar-dark">
+    <div class="container-fluid">
+      <span class="navbar-brand">
+        <i class="fas fa-graduation-cap"></i>
+        Admission Officer
+      </span>
+      <span class="navbar-text text-white">
+        AI-powered college admissions guidance
+      </span>
+    </div>
+  </nav>
+
+  <div class="container-main">
+    <div class="row">
+      <!-- Sidebar: Student List -->
+      <div class="col-lg-3">
+        <div class="card">
+          <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
+            <span><i class="fas fa-users"></i> Students</span>
+            <button class="btn btn-sm btn-light" id="btnNewStudent">
+              <i class="fas fa-plus"></i>
+            </button>
+          </div>
+          <div class="card-body p-0">
+            <div id="studentList" style="max-height: 600px; overflow-y: auto;">
+              <p class="text-muted text-center py-3">No students yet</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Main Content -->
+      <div class="col-lg-9">
+        <div id="welcomeScreen" class="card">
+          <div class="card-body text-center py-5">
+            <i class="fas fa-book-open" style="font-size: 3rem; color: var(--primary); margin-bottom: 1rem;"></i>
+            <h3>Welcome to Admission Officer</h3>
+            <p class="text-muted">Create a new student or select one to get started</p>
+          </div>
+        </div>
+
+        <div id="studentFormContainer" style="display: none;">
+          <ul class="nav nav-tabs mb-3" id="formTabs" role="tablist">
+            <li class="nav-item">
+              <a class="nav-link active" id="profile-tab" data-bs-toggle="tab" href="#profile-content">
+                <i class="fas fa-user"></i> Profile
+              </a>
+            </li>
+            <li class="nav-item">
+              <a class="nav-link" id="university-tab" data-bs-toggle="tab" href="#university-content">
+                <i class="fas fa-school"></i> University
+              </a>
+            </li>
+            <li class="nav-item">
+              <a class="nav-link" id="export-tab" data-bs-toggle="tab" href="#export-content">
+                <i class="fas fa-download"></i> Export
+              </a>
+            </li>
+          </ul>
+
+          <div class="tab-content">
+            <!-- Profile Tab -->
+            <div class="tab-pane fade show active" id="profile-content">
+              <div class="card">
+                <div class="card-header bg-light">
+                  <h5 class="mb-0"><i class="fas fa-user-circle"></i> Student Profile</h5>
+                </div>
+                <div class="card-body">
+                  <form id="studentProfileForm">
+                    <!-- Personal Section -->
+                    <div class="section-header">
+                      <h5>Personal Information</h5>
+                    </div>
+                    <div class="row">
+                      <div class="col-md-6 mb-3">
+                        <label class="form-label">Full Name</label>
+                        <input type="text" class="form-control" id="name" placeholder="John Doe">
+                      </div>
+                      <div class="col-md-6 mb-3">
+                        <label class="form-label">Graduation Year</label>
+                        <input type="text" class="form-control" id="gradYear" placeholder="2025">
+                      </div>
+                      <div class="col-md-6 mb-3">
+                        <label class="form-label">High School</label>
+                        <input type="text" class="form-control" id="highSchool" placeholder="Central High School">
+                      </div>
+                      <div class="col-md-6 mb-3">
+                        <label class="form-label">Intended Majors</label>
+                        <div id="majorsList" class="mb-2"></div>
+                        <div class="input-group">
+                          <input type="text" class="form-control" id="majorInput" placeholder="e.g., Computer Science">
+                          <button class="btn btn-outline-primary" type="button" id="btnAddMajor">
+                            <i class="fas fa-plus"></i>
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+
+                    <!-- Academics Section -->
+                    <div class="section-header">
+                      <h5>Academic Information</h5>
+                    </div>
+                    <div class="row">
+                      <div class="col-md-4 mb-3">
+                        <label class="form-label">Weighted GPA</label>
+                        <input type="text" class="form-control" id="gpaWeighted" placeholder="3.85">
+                      </div>
+                      <div class="col-md-4 mb-3">
+                        <label class="form-label">Unweighted GPA</label>
+                        <input type="text" class="form-control" id="gpaUnweighted" placeholder="3.65">
+                      </div>
+                      <div class="col-md-4 mb-3">
+                        <label class="form-label">Class Rank</label>
+                        <input type="text" class="form-control" id="classRank" placeholder="5/250">
+                      </div>
+                    </div>
+
+                    <!-- Standardized Tests Section -->
+                    <div class="section-header">
+                      <h5>Standardized Tests</h5>
+                    </div>
+                    <div class="row">
+                      <div class="col-md-4 mb-3">
+                        <label class="form-label">SAT Total</label>
+                        <input type="text" class="form-control" id="satTotal" placeholder="1550">
+                      </div>
+                      <div class="col-md-4 mb-3">
+                        <label class="form-label">SAT Math</label>
+                        <input type="text" class="form-control" id="satMath" placeholder="800">
+                      </div>
+                      <div class="col-md-4 mb-3">
+                        <label class="form-label">SAT Reading</label>
+                        <input type="text" class="form-control" id="satReading" placeholder="750">
+                      </div>
+                      <div class="col-md-6 mb-3">
+                        <label class="form-label">ACT Composite</label>
+                        <input type="text" class="form-control" id="actComposite" placeholder="35">
+                      </div>
+                    </div>
+
+                    <!-- AP/IB Scores -->
+                    <div class="mb-4">
+                      <h6 class="mb-3">AP Scores</h6>
+                      <div id="apScoresList" class="mb-3"></div>
+                      <div class="input-group mb-3">
+                        <input type="text" class="form-control" id="apSubject" placeholder="Subject">
+                        <input type="text" class="form-control" id="apScore" placeholder="Score">
+                        <button class="btn btn-outline-primary" type="button" id="btnAddAp">
+                          <i class="fas fa-plus"></i>
+                        </button>
+                      </div>
+
+                      <h6 class="mb-3">IB Scores</h6>
+                      <div id="ibScoresList" class="mb-3"></div>
+                      <div class="input-group">
+                        <input type="text" class="form-control" id="ibSubject" placeholder="Subject">
+                        <input type="text" class="form-control" id="ibScore" placeholder="Score">
+                        <button class="btn btn-outline-primary" type="button" id="btnAddIb">
+                          <i class="fas fa-plus"></i>
+                        </button>
+                      </div>
+                    </div>
+
+                    <!-- Extracurriculars Section -->
+                    <div class="section-header">
+                      <h5>Extracurricular Activities</h5>
+                    </div>
+                    <div id="extracurricularsList" class="mb-3"></div>
+                    <button type="button" class="btn btn-sm btn-outline-primary mb-4" id="btnAddExtracurricular">
+                      <i class="fas fa-plus"></i> Add Activity
+                    </button>
+
+                    <!-- Awards Section -->
+                    <div class="section-header">
+                      <h5>Awards & Recognitions</h5>
+                    </div>
+                    <div id="awardsList" class="mb-3"></div>
+                    <button type="button" class="btn btn-sm btn-outline-primary mb-4" id="btnAddAward">
+                      <i class="fas fa-plus"></i> Add Award
+                    </button>
+
+                    <!-- Shadowing Section -->
+                    <div class="section-header">
+                      <h5>Shadowing Experiences</h5>
+                    </div>
+                    <div id="shadowingList" class="mb-3"></div>
+                    <button type="button" class="btn btn-sm btn-outline-primary mb-4" id="btnAddShadowing">
+                      <i class="fas fa-plus"></i> Add Experience
+                    </button>
+
+                    <!-- Research Section -->
+                    <div class="section-header">
+                      <h5>Research Experiences</h5>
+                    </div>
+                    <div id="researchList" class="mb-3"></div>
+                    <button type="button" class="btn btn-sm btn-outline-primary mb-4" id="btnAddResearch">
+                      <i class="fas fa-plus"></i> Add Research
+                    </button>
+
+                    <div class="d-flex gap-2">
+                      <button type="button" class="btn btn-danger" id="btnDeleteStudent">
+                        <i class="fas fa-trash"></i> Delete Student
+                      </button>
+                    </div>
+                  </form>
+                </div>
+              </div>
+            </div>
+
+            <!-- University Tab -->
+            <div class="tab-pane fade" id="university-content">
+              <div class="card">
+                <div class="card-header bg-light">
+                  <h5 class="mb-0"><i class="fas fa-school"></i> University Profiles</h5>
+                </div>
+                <div class="card-body">
+                  <div class="mb-4">
+                    <label class="form-label">University Domain</label>
+                    <div class="input-group">
+                      <span class="input-group-text">https://</span>
+                      <input type="text" class="form-control" id="universityDomain" placeholder="www.stanford.edu">
+                      <button class="btn btn-primary" type="button" id="btnScrapeUniversity">
+                        <i class="fas fa-sync"></i> Scrape
+                      </button>
+                    </div>
+                    <small class="text-muted d-block mt-2">Enter the university website domain and click Scrape to fetch university information</small>
+                  </div>
+
+                  <div id="universitiesList" class="mb-4"></div>
+
+                  <div id="universityFormContainer" style="display: none;">
+                    <div class="section-header">
+                      <h5 id="universityNameDisplay"></h5>
+                    </div>
+                    <form id="universityForm">
+                      <div class="row">
+                        <div class="col-md-6 mb-3">
+                          <label class="form-label">Tagline</label>
+                          <input type="text" class="form-control" id="uniTagline">
+                        </div>
+                        <div class="col-md-6 mb-3">
+                          <label class="form-label">Campus Ethos</label>
+                          <input type="text" class="form-control" id="uniCampusEthos">
+                        </div>
+                      </div>
+
+                      <div class="mb-3">
+                        <label class="form-label">Mission</label>
+                        <textarea class="form-control" id="uniMission" rows="3"></textarea>
+                      </div>
+
+                      <div class="mb-3">
+                        <label class="form-label">Culture</label>
+                        <textarea class="form-control" id="uniCulture" rows="3"></textarea>
+                      </div>
+
+                      <div class="mb-3">
+                        <label class="form-label">Core Values</label>
+                        <div id="uniCoreValuesList" class="mb-2"></div>
+                        <div class="input-group">
+                          <input type="text" class="form-control" id="uniCoreValueInput" placeholder="e.g., Innovation">
+                          <button class="btn btn-outline-primary" type="button" id="btnAddCoreValue">
+                            <i class="fas fa-plus"></i>
+                          </button>
+                        </div>
+                      </div>
+
+                      <div class="mb-3">
+                        <label class="form-label">Academic Specialties</label>
+                        <div id="uniSpecialtiesList" class="mb-2"></div>
+                        <div class="input-group">
+                          <input type="text" class="form-control" id="uniSpecialtyInput" placeholder="e.g., Computer Science">
+                          <button class="btn btn-outline-primary" type="button" id="btnAddSpecialty">
+                            <i class="fas fa-plus"></i>
+                          </button>
+                        </div>
+                      </div>
+
+                      <div class="mb-3">
+                        <label class="form-label">Notable Programs</label>
+                        <div id="uniProgramsList" class="mb-2"></div>
+                        <div class="input-group">
+                          <input type="text" class="form-control" id="uniProgramInput" placeholder="e.g., Honors Program">
+                          <button class="btn btn-outline-primary" type="button" id="btnAddProgram">
+                            <i class="fas fa-plus"></i>
+                          </button>
+                        </div>
+                      </div>
+
+                      <div class="mb-3">
+                        <label class="form-label">Ideal Candidate Traits</label>
+                        <div id="uniTraitsList" class="mb-2"></div>
+                        <div class="input-group">
+                          <input type="text" class="form-control" id="uniTraitInput" placeholder="e.g., Leadership">
+                          <button class="btn btn-outline-primary" type="button" id="btnAddTrait">
+                            <i class="fas fa-plus"></i>
+                          </button>
+                        </div>
+                      </div>
+
+                      <div id="uniMajorNotesContainer"></div>
+
+                      <div class="d-flex gap-2 mt-4">
+                        <button type="button" class="btn btn-danger" id="btnDeleteUniversity">
+                          <i class="fas fa-trash"></i> Delete University
+                        </button>
+                      </div>
+                    </form>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Export Tab -->
+            <div class="tab-pane fade" id="export-content">
+              <div class="card">
+                <div class="card-header bg-light">
+                  <h5 class="mb-0"><i class="fas fa-download"></i> Export Data</h5>
+                </div>
+                <div class="card-body">
+                  <div class="row">
+                    <div class="col-md-6">
+                      <div class="card border-primary">
+                        <div class="card-body">
+                          <h6 class="card-title">
+                            <i class="fas fa-file-pdf text-danger"></i> Student Profile PDF
+                          </h6>
+                          <p class="card-text text-muted">Export your student profile as a PDF document</p>
+                          <button class="btn btn-primary w-100" id="btnExportStudentPdf">
+                            <i class="fas fa-download"></i> Export
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                    <div class="col-md-6">
+                      <div class="card border-primary">
+                        <div class="card-body">
+                          <h6 class="card-title">
+                            <i class="fas fa-file-pdf text-danger"></i> University Profile PDF
+                          </h6>
+                          <p class="card-text text-muted">Export university information as a PDF document</p>
+                          <button class="btn btn-primary w-100" id="btnExportUniversityPdf" disabled>
+                            <i class="fas fa-download"></i> Export
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Loading Spinner -->
+  <div class="loading-spinner" id="loadingSpinner">
+    <div class="spinner-content">
+      <div class="spinner-border text-primary" role="status">
+        <span class="visually-hidden">Loading...</span>
+      </div>
+      <p id="loadingText">Scraping university website...</p>
+    </div>
+  </div>
+
+  <!-- New Student Modal -->
+  <div class="modal fade" id="newStudentModal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title">Create New Student</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <div class="mb-3">
+            <label class="form-label">Student Name</label>
+            <input type="text" class="form-control" id="newStudentName" placeholder="John Doe">
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+          <button type="button" class="btn btn-primary" id="btnCreateStudent">Create</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+  <script src="/app.js"></script>
+</body>
+</html>
