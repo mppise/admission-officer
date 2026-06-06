@@ -1604,29 +1604,32 @@ function exportGuidancePdf() {
   // Bootstrap CSS for PDF rendering
   const bootstrapStyles = `
     <style>
-      * { margin: 0; padding: 0; }
-      body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; font-size: 11px; line-height: 1.5; color: #000; }
-      .container { max-width: 750px; margin: 0 auto; padding: 20px; }
-      h1, h2, h3, h4, h5, h6 { margin: 20px 0 10px 0; font-weight: 600; line-height: 1.3; }
-      h1 { font-size: 24px; }
-      h2 { font-size: 18px; color: #4f46e5; }
-      h3 { font-size: 14px; color: #1f2937; }
-      p { margin: 10px 0; }
-      ul, ol { margin: 10px 0 10px 20px; }
-      li { margin: 5px 0; }
-      .mb-2 { margin-bottom: 8px; }
-      .mb-3 { margin-bottom: 12px; }
-      .mb-4 { margin-bottom: 16px; }
-      .alert { padding: 12px; margin: 10px 0; border-radius: 4px; }
+      * { margin: 0 !important; padding: 0 !important; }
+      body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; font-size: 9px !important; line-height: 1.4 !important; color: #000 !important; }
+      .container { max-width: 750px; margin: 0 auto; padding: 10px; }
+      h1, h2, h3, h4, h5, h6 { margin: 8px 0 4px 0 !important; font-weight: 600 !important; line-height: 1.2 !important; }
+      h1 { font-size: 16px !important; }
+      h2 { font-size: 13px !important; color: #4f46e5 !important; }
+      h3 { font-size: 11px !important; color: #1f2937 !important; }
+      h4, h5, h6 { font-size: 10px !important; }
+      p { margin: 4px 0 !important; font-size: 9px !important; }
+      ul, ol { margin: 4px 0 4px 12px !important; }
+      li { margin: 2px 0 !important; font-size: 9px !important; }
+      .mb-2 { margin-bottom: 4px !important; }
+      .mb-3 { margin-bottom: 6px !important; }
+      .mb-4 { margin-bottom: 8px !important; }
+      .alert { padding: 8px !important; margin: 6px 0 !important; border-radius: 4px; font-size: 9px !important; }
       .alert-info { background-color: #e0f2fe; border-left: 4px solid #0284c7; color: #075985; }
       .alert-warning { background-color: #fef3c7; border-left: 4px solid #f59e0b; color: #92400e; }
-      .text-primary { color: #4f46e5; }
-      .text-secondary { color: #6b7280; }
-      .fw-bold { font-weight: 600; }
-      .blockquote { margin: 10px 0; padding-left: 16px; border-left: 4px solid #4f46e5; color: #6b7280; font-style: italic; }
+      .text-primary { color: #4f46e5 !important; }
+      .text-secondary { color: #6b7280 !important; }
+      .fw-bold { font-weight: 600 !important; }
+      .blockquote { margin: 6px 0 !important; padding-left: 12px; border-left: 4px solid #4f46e5; color: #6b7280; font-style: italic; font-size: 9px !important; }
       .list-unstyled { list-style: none; margin: 0; padding: 0; }
-      .ps-3 { padding-left: 12px; }
-      strong { font-weight: 600; }
+      .ps-3 { padding-left: 8px !important; }
+      strong { font-weight: 600 !important; }
+      code { font-size: 8px !important; }
+      table { font-size: 8px !important; }
     </style>
   `;
 
@@ -1638,11 +1641,11 @@ function exportGuidancePdf() {
     </head>
     <body>
       <div class="container">
-        <h1 style="color: #4f46e5; margin-bottom: 20px;">Admissions Guidance Report</h1>
+        <h1 style="color: #4f46e5 !important; margin-bottom: 8px !important;">Admissions Guidance Report</h1>
         <p><strong>Student:</strong> ${student.name}</p>
         <p><strong>University:</strong> ${uni.universityName}</p>
         <p><strong>Generated:</strong> ${new Date().toLocaleDateString()}</p>
-        <hr style="margin: 20px 0; border: none; border-top: 1px solid #e5e7eb;">
+        <hr style="margin: 8px 0 !important; border: none; border-top: 1px solid #e5e7eb;">
         ${elements.guidanceContent.innerHTML}
       </div>
     </body>
@@ -1689,33 +1692,36 @@ function exportAllEssaysPdf() {
   // Bootstrap CSS for PDF rendering
   const bootstrapStyles = `
     <style>
-      * { margin: 0; padding: 0; }
-      body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; font-size: 11px; line-height: 1.5; color: #000; }
-      .container { max-width: 750px; margin: 0 auto; padding: 20px; }
-      h1, h2, h3, h4, h5, h6 { margin: 20px 0 10px 0; font-weight: 600; line-height: 1.3; }
-      h1 { font-size: 24px; }
-      h2 { font-size: 18px; color: #4f46e5; }
-      h3 { font-size: 14px; color: #1f2937; }
-      .essay-section { margin: 20px 0; padding: 15px; background-color: #f9fafb; border-radius: 4px; }
-      .essay-prompt { font-style: italic; color: #6b7280; margin: 10px 0; }
-      .essay-guidance { margin-top: 15px; }
-      p { margin: 10px 0; }
-      ul, ol { margin: 10px 0 10px 20px; }
-      li { margin: 5px 0; }
-      .mb-2 { margin-bottom: 8px; }
-      .mb-3 { margin-bottom: 12px; }
-      .mb-4 { margin-bottom: 16px; }
-      .alert { padding: 12px; margin: 10px 0; border-radius: 4px; }
+      * { margin: 0 !important; padding: 0 !important; }
+      body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; font-size: 9px !important; line-height: 1.4 !important; color: #000 !important; }
+      .container { max-width: 750px; margin: 0 auto; padding: 10px; }
+      h1, h2, h3, h4, h5, h6 { margin: 8px 0 4px 0 !important; font-weight: 600 !important; line-height: 1.2 !important; }
+      h1 { font-size: 16px !important; }
+      h2 { font-size: 13px !important; color: #4f46e5 !important; }
+      h3 { font-size: 11px !important; color: #1f2937 !important; }
+      h4, h5, h6 { font-size: 10px !important; }
+      .essay-section { margin: 10px 0 !important; padding: 8px !important; background-color: #f9fafb; border-radius: 4px; }
+      .essay-prompt { font-style: italic; color: #6b7280; margin: 4px 0 !important; font-size: 9px !important; }
+      .essay-guidance { margin-top: 6px !important; }
+      p { margin: 4px 0 !important; font-size: 9px !important; }
+      ul, ol { margin: 4px 0 4px 12px !important; }
+      li { margin: 2px 0 !important; font-size: 9px !important; }
+      .mb-2 { margin-bottom: 4px !important; }
+      .mb-3 { margin-bottom: 6px !important; }
+      .mb-4 { margin-bottom: 8px !important; }
+      .alert { padding: 8px !important; margin: 6px 0 !important; border-radius: 4px; font-size: 9px !important; }
       .alert-info { background-color: #e0f2fe; border-left: 4px solid #0284c7; color: #075985; }
       .alert-warning { background-color: #fef3c7; border-left: 4px solid #f59e0b; color: #92400e; }
-      .text-primary { color: #4f46e5; }
-      .text-secondary { color: #6b7280; }
-      .fw-bold { font-weight: 600; }
-      .blockquote { margin: 10px 0; padding-left: 16px; border-left: 4px solid #4f46e5; color: #6b7280; font-style: italic; }
+      .text-primary { color: #4f46e5 !important; }
+      .text-secondary { color: #6b7280 !important; }
+      .fw-bold { font-weight: 600 !important; }
+      .blockquote { margin: 6px 0 !important; padding-left: 12px; border-left: 4px solid #4f46e5; color: #6b7280; font-style: italic; font-size: 9px !important; }
       .list-unstyled { list-style: none; margin: 0; padding: 0; }
-      .ps-3 { padding-left: 12px; }
-      strong { font-weight: 600; }
-      hr { margin: 20px 0; border: none; border-top: 1px solid #e5e7eb; }
+      .ps-3 { padding-left: 8px !important; }
+      strong { font-weight: 600 !important; }
+      code { font-size: 8px !important; }
+      table { font-size: 8px !important; }
+      hr { margin: 8px 0 !important; border: none; border-top: 1px solid #e5e7eb; }
     </style>
   `;
 
