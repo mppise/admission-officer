@@ -1,7 +1,7 @@
 import express from 'express';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import { scrapeUniversity } from '../dist/utils/universityScraper.js';
+import { scrapeUniversity } from '../utils/universityScraper.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
